@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nex-lexer",
+    "crates/nex-driver",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/boroc/nex"
+rust-version = "1.83"
+
+[workspace.dependencies]
+nex-lexer = { path = "crates/nex-lexer" }
+# Pinned to the newest releases that still build on our MSRV (1.83). Cargo only
+# became MSRV-aware in 1.84, so these have to be exact.
+clap = { version = "=4.5.23", features = ["derive"] }
+insta = "=1.41.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

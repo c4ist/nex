@@ -1,0 +1,13 @@
+/target
+**/*.rs.bk
+*.pdb
+*.log
+*.o
+*.obj
+*.exe
+*.wasm
+*.ll
+/docs/book
+node_modules/
+.DS_Store
+*.pending-snap
