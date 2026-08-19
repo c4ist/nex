@@ -29,6 +29,15 @@ compiled to native code through LLVM (and to WebAssembly) for release. See
 | `docs/`              | Language specification and documentation site |
 | `progress.txt`       | Which roadmap step is done, and what is next  |
 
+## Documentation
+
+The documentation site lives in [`docs/`](docs/src/index.md) (an mdBook
+project; `mdbook serve docs` to view it locally). It covers the [language
+spec](docs/src/language-design.md), the [lexical structure
+reference](docs/src/reference/lexical-structure.md), the [compiler
+architecture](docs/src/internals/architecture.md) and the
+[roadmap](docs/src/roadmap.md).
+
 ## Building
 
 Requires a stable Rust toolchain (1.83 or newer).

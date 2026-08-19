@@ -1,0 +1,11 @@
+[book]
+title = "Nex Language Documentation"
+authors = ["c4ist"]
+language = "en"
+description = "Documentation for the Nex programming language and compiler"
+
+[build]
+build-dir = "book"
+
+[output.html]
+git-repository-url = "https://github.com/c4ist/nex"

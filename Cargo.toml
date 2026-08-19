@@ -10,7 +10,7 @@ members = [
 version = "0.0.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/boroc/nex"
+repository = "https://github.com/c4ist/nex"
 rust-version = "1.83"
 
 [workspace.dependencies]
