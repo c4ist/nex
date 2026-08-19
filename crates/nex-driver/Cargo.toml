@@ -1,0 +1,15 @@
+[package]
+name = "nex-driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Command line driver for the Nex programming language"
+
+[[bin]]
+name = "nex"
+path = "src/main.rs"
+
+[dependencies]
+nex-lexer.workspace = true
+clap.workspace = true
