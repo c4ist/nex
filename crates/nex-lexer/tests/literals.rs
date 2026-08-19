@@ -4,7 +4,7 @@ fn kinds_of_errors(src: &str) -> Vec<LexErrorKind> {
     tokenize(src).1.into_iter().map(|e| e.kind).collect()
 }
 
-// ------------------------------------------------------------------ integers
+// integers
 
 #[test]
 fn decimal_integers() {
@@ -57,7 +57,7 @@ fn integer_overflow_is_reported() {
     );
 }
 
-// -------------------------------------------------------------------- floats
+// floats
 
 #[test]
 fn simple_floats() {
@@ -119,7 +119,7 @@ fn trailing_dot_before_identifier_is_malformed() {
 
 #[test]
 fn dangling_exponent_marker_is_not_consumed() {
-    // `1e` is an integer followed by an identifier, not a broken float.
+    // `1e` is an int followed by an ident, not a broken float
     assert_eq!(
         tokenize_kinds("1e"),
         vec![
@@ -131,7 +131,7 @@ fn dangling_exponent_marker_is_not_consumed() {
     assert!(tokenize("1e").1.is_empty());
 }
 
-// ------------------------------------------------------------------- strings
+// strings
 
 #[test]
 fn plain_string() {
@@ -199,6 +199,6 @@ fn unterminated_string_stops_at_newline_and_recovers() {
     let (tokens, errors) = tokenize("\"oops\nlet");
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0].kind, LexErrorKind::UnterminatedString);
-    // Scanning continues on the next line.
+    // scanning picks back up on the next line
     assert_eq!(tokens[1].kind, TokenKind::Let);
 }

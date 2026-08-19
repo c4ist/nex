@@ -33,9 +33,8 @@ fn a_long_run_of_invalid_characters_does_not_overflow_the_stack() {
     assert_eq!(errors.len(), 200_000);
 }
 
-/// A tiny deterministic fuzzer: mutate a known-good program in many ways and
-/// require that the lexer always terminates, never panics, and always emits a
-/// final `Eof` token.
+/// tiny deterministic fuzzer. mutate a known-good program a bunch of ways and
+/// check the lexer always terminates, never panics, and always ends with eof.
 #[test]
 fn lexer_never_panics_on_mutated_input() {
     let seed = include_str!("../../../examples/tour.nex");
@@ -44,7 +43,7 @@ fn lexer_never_panics_on_mutated_input() {
         .chars()
         .collect();
 
-    // xorshift so the corpus is reproducible without a dependency.
+    // xorshift so the corpus is reproducible without pulling in rand
     let mut state: u64 = 0x2545_F491_4F6C_DD1D;
     let mut next = |bound: usize| -> usize {
         state ^= state << 13;

@@ -1,39 +1,38 @@
-//! Identity and source-location plumbing shared by every AST node.
+//! identity and location plumbing shared by every ast node.
 //!
-//! Two invariants hold across the whole tree:
+//! two rules hold across the whole tree:
 //!
-//! 1. **Every node has a [`Span`].** Later passes (type checking, the language
-//!    server) must be able to point at the exact source text responsible for
-//!    any node, so no node may be built without one.
-//! 2. **Every node has a unique [`NodeId`].** Ids let later passes hang
-//!    information off a node in side tables instead of mutating the tree, which
-//!    keeps the AST immutable after parsing.
+//! 1. every node has a [`Span`], so later passes (type checker, lsp) can always
+//!    point at the source text that caused something.
+//! 2. every node has a unique [`NodeId`], so later passes can hang info off a
+//!    node in side tables instead of mutating the tree. the ast is immutable
+//!    once parsed.
 
 use nex_lexer::Span;
 use std::fmt;
 
-/// A node's identity within a single parsed module.
+/// a node's identity within one parsed module
 ///
-/// Ids are dense and allocated sequentially by [`NodeIdGen`], so they double as
-/// indices into side tables (`Vec<T>` keyed by `id.index()`).
+/// ids are dense and handed out in order by [`NodeIdGen`], so they double as
+/// indices into side tables (`Vec<T>` keyed by `id.index()`)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(u32);
 
 impl NodeId {
-    /// A placeholder for nodes synthesised during error recovery, which do not
-    /// correspond to anything the user wrote.
+    /// placeholder for nodes we invent during error recovery, which don't
+    /// correspond to anything the user actually wrote
     pub const DUMMY: NodeId = NodeId(u32::MAX);
 
-    /// The raw index. Only [`NodeIdGen`] should construct ids directly.
+    /// raw index. only [`NodeIdGen`] should be building ids directly
     pub fn as_u32(self) -> u32 {
         self.0
     }
 
-    /// Position in a side table keyed by node id.
+    /// slot in a side table keyed by node id
     ///
-    /// # Panics
+    /// # panics
     ///
-    /// Panics if called on [`NodeId::DUMMY`], which has no table slot.
+    /// on [`NodeId::DUMMY`], which has no slot
     pub fn index(self) -> usize {
         assert!(!self.is_dummy(), "NodeId::DUMMY has no side-table index");
         self.0 as usize
@@ -54,7 +53,7 @@ impl fmt::Debug for NodeId {
     }
 }
 
-/// Hands out fresh [`NodeId`]s while parsing one module.
+/// hands out fresh ids while parsing one module
 #[derive(Debug, Default)]
 pub struct NodeIdGen {
     next: u32,
@@ -65,13 +64,12 @@ impl NodeIdGen {
         NodeIdGen::default()
     }
 
-    /// Allocates the next unused id.
+    /// next unused id
     ///
-    /// # Panics
+    /// # panics
     ///
-    /// Panics if more than `u32::MAX - 1` nodes are allocated, which would
-    /// collide with [`NodeId::DUMMY`]. A source file that large is not a case
-    /// worth degrading gracefully for.
+    /// past `u32::MAX - 1` nodes, since that would collide with
+    /// [`NodeId::DUMMY`]. not a file size worth handling gracefully.
     pub fn fresh(&mut self) -> NodeId {
         assert!(self.next < u32::MAX, "exhausted the NodeId space");
         let id = NodeId(self.next);
@@ -79,13 +77,13 @@ impl NodeIdGen {
         id
     }
 
-    /// How many ids have been handed out. Also the length a side table needs.
+    /// how many ids we've handed out, ie. the length a side table needs
     pub fn allocated(&self) -> usize {
         self.next as usize
     }
 }
 
-/// The identity and location every AST node embeds.
+/// the identity + location every ast node embeds
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct NodeInfo {
     pub id: NodeId,
@@ -97,7 +95,7 @@ impl NodeInfo {
         NodeInfo { id, span }
     }
 
-    /// A node not present in the source, used during error recovery.
+    /// a node that isn't in the source, for error recovery
     pub fn dummy(span: Span) -> Self {
         NodeInfo {
             id: NodeId::DUMMY,
@@ -112,12 +110,12 @@ impl fmt::Debug for NodeInfo {
     }
 }
 
-/// Anything that knows where it came from.
+/// anything that knows where it came from
 pub trait HasSpan {
     fn span(&self) -> Span;
 }
 
-/// An AST node: a spanned thing that also has an identity.
+/// a spanned thing that also has an identity
 pub trait AstNode: HasSpan {
     fn id(&self) -> NodeId;
 
@@ -138,8 +136,8 @@ impl AstNode for NodeInfo {
     }
 }
 
-/// Attaches a span to a value that needs no identity of its own, such as an
-/// identifier, a field name or an operator.
+/// attaches a span to a value that doesn't need its own identity, like an
+/// ident, a field name or an operator
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Spanned<T> {
     pub value: T,
@@ -151,7 +149,7 @@ impl<T> Spanned<T> {
         Spanned { value, span }
     }
 
-    /// Transforms the value, keeping the span.
+    /// map the value, keep the span
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
         Spanned {
             value: f(self.value),
@@ -179,12 +177,12 @@ impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     }
 }
 
-/// An identifier as written in the source.
+/// an identifier as written in the source
 pub type Ident = Spanned<String>;
 
-/// The smallest span covering every element, or `fallback` when empty.
+/// smallest span covering every element, or `fallback` if there are none
 ///
-/// Used to give a parent node a span derived from its children.
+/// used to give a parent node a span derived from its children
 pub fn spanning<T: HasSpan>(items: &[T], fallback: Span) -> Span {
     let mut iter = items.iter();
     match iter.next() {

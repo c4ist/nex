@@ -87,7 +87,7 @@ fn spans_track_byte_offsets() {
             Span::new(6, 7),   // =
             Span::new(8, 9),   // 1
             Span::new(9, 10),  // ;
-            Span::new(10, 10), // EOF
+            Span::new(10, 10), // eof
         ]
     );
 }
@@ -106,7 +106,7 @@ fn spans_slice_back_to_source() {
 
 #[test]
 fn spans_are_correct_after_multibyte_characters() {
-    // "é" is two bytes, so the following token must start at offset 3.
+    // "é" is two bytes, so the next token must start at offset 3
     let src = "é x";
     let (tokens, errors) = tokenize(src);
     assert!(errors.is_empty());

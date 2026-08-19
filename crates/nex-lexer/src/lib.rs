@@ -1,4 +1,4 @@
-//! The Nex lexer: turns source text into a stream of [`Token`]s.
+//! the nex lexer. turns source text into a stream of tokens.
 //!
 //! ```
 //! use nex_lexer::{tokenize, TokenKind};
@@ -18,8 +18,8 @@ pub use lexer::Lexer;
 pub use span::Span;
 pub use token::{Token, TokenKind};
 
-/// Scans `src` completely, returning every token (ending in [`TokenKind::Eof`])
-/// alongside every recoverable error encountered.
+/// scans the whole thing. returns every token (ending in eof) plus every
+/// recoverable error we hit along the way
 pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexError>) {
     let mut lexer = Lexer::new(src);
     let mut tokens = Vec::new();
@@ -29,16 +29,14 @@ pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexError>) {
     (tokens, lexer.into_errors())
 }
 
-/// Scans `src`, discarding spans. Convenient for tests that only care about
-/// the shape of the token stream.
+/// same but drops the spans. handy for tests that only care about the shape
 pub fn tokenize_kinds(src: &str) -> Vec<TokenKind> {
     tokenize(src).0.into_iter().map(|t| t.kind).collect()
 }
 
-/// Renders a token stream as one `Kind@start..end` line per token.
+/// one `Kind@start..end` line per token
 ///
-/// This is the canonical debug format used by snapshot tests and by
-/// `nex lex`, so it is deliberately stable.
+/// used by the snapshot tests and `nex lex`, so keep the format stable
 pub fn dump_tokens(src: &str) -> String {
     let (tokens, errors) = tokenize(src);
     let mut out = String::new();

@@ -1,9 +1,9 @@
-# Task runner for the Nex repository. Requires `just` (cargo install just).
-# On Windows without `just`, use scripts/check.ps1 instead.
+# task runner. needs `just` (cargo install just)
+# on windows without it, use scripts/check.ps1
 
 default: check
 
-# Everything CI runs, in CI order.
+# everything ci runs, in ci order
 check: fmt-check lint test
 
 test:
@@ -18,10 +18,10 @@ fmt:
 fmt-check:
     cargo fmt --all -- --check
 
-# Regenerate the insta snapshots, then review the diff before committing.
+# regen the insta snapshots, then check the diff before committing
 snapshots:
     INSTA_UPDATE=always cargo test --workspace
 
-# Dump the token stream for a source file.
+# dump the token stream for a file
 lex file:
     cargo run -q -p nex-driver -- lex {{file}}

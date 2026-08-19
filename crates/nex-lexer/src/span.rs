@@ -1,7 +1,7 @@
 use std::fmt;
 use std::ops::Range;
 
-/// A half-open byte range `[start, end)` into a source file.
+/// half-open byte range `[start, end)` into a source file
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Span {
     pub start: u32,
@@ -18,7 +18,7 @@ impl Span {
         Span::new(start as u32, end as u32)
     }
 
-    /// The smallest span covering both `self` and `other`.
+    /// smallest span that covers both
     pub fn merge(self, other: Span) -> Span {
         Span::new(self.start.min(other.start), self.end.max(other.end))
     }
@@ -35,7 +35,7 @@ impl Span {
         self.start as usize..self.end as usize
     }
 
-    /// The text this span covers, assuming `src` is the file it came from.
+    /// the text this span covers. `src` must be the file it came from
     pub fn text(self, src: &str) -> &str {
         &src[self.range()]
     }

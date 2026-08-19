@@ -1,4 +1,4 @@
-# Runs the same checks as CI. Usage: .\scripts\check.ps1
+# same checks as ci. usage: .\scripts\check.ps1
 $ErrorActionPreference = "Stop"
 
 Write-Host "==> cargo fmt --check" -ForegroundColor Cyan

@@ -1,7 +1,7 @@
-//! A minimal source-snippet diagnostic renderer.
+//! tiny source-snippet diagnostic renderer.
 //!
-//! This is deliberately dependency-free for now; Phase 3 of the roadmap
-//! replaces it with `ariadne` once the parser produces richer diagnostics.
+//! dependency-free on purpose for now. swap it for `ariadne` in phase 3 once the
+//! parser starts producing richer diagnostics.
 
 use nex_lexer::Span;
 use std::fmt::Write as _;
@@ -12,7 +12,7 @@ pub struct Diagnostic {
     pub help: Option<String>,
 }
 
-/// Renders `diagnostics` against `src`, annotating the offending lines.
+/// renders diagnostics against `src`, annotating the offending lines
 pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
     let mut out = String::new();
     for diagnostic in diagnostics {
@@ -26,7 +26,7 @@ pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
         let _ = writeln!(out, "{pad} |");
         let _ = writeln!(out, "{line_no} | {line_text}");
 
-        // Underline the span, clamped to this line.
+        // underline the span, clamped to this line
         let start_col = diagnostic.span.start as usize - line_start;
         let end_on_line = (diagnostic.span.end as usize).min(line_start + line_text.len());
         let width = end_on_line
@@ -47,8 +47,8 @@ pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
     out
 }
 
-/// Returns `(line_number, column_number, line_start_offset, line_text)` for a
-/// byte offset. Both numbers are 1-based.
+/// `(line, col, line_start_offset, line_text)` for a byte offset. line and col
+/// are 1-based
 fn locate(src: &str, offset: usize) -> (usize, usize, usize, &str) {
     let offset = offset.min(src.len());
     let line_start = src[..offset].rfind('\n').map(|i| i + 1).unwrap_or(0);
@@ -62,7 +62,7 @@ fn locate(src: &str, offset: usize) -> (usize, usize, usize, &str) {
     (line_no, col_no, line_start, line_text)
 }
 
-/// Character count, used so the caret lines up under multi-byte text.
+/// char count, so the caret lines up under multi-byte text
 fn display_width(text: &str) -> usize {
     text.chars().count()
 }

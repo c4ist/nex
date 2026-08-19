@@ -1,4 +1,4 @@
-//! `nex` — the command line driver for the Nex programming language.
+//! `nex` - the cli for the nex programming language.
 
 mod diag;
 
@@ -22,40 +22,40 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Compile a program to a native executable.
+    /// compile a program to a native executable
     Build {
-        /// The entry-point source file.
+        /// entry-point source file
         file: PathBuf,
-        /// Where to write the executable.
+        /// where to write the executable
         #[arg(short, long)]
         out: Option<PathBuf>,
     },
-    /// Type-check and run a program.
+    /// type-check and run a program
     Run {
-        /// The entry-point source file.
+        /// entry-point source file
         file: PathBuf,
     },
-    /// Type-check a program without running it.
+    /// type-check a program without running it
     Check {
-        /// The entry-point source file.
+        /// entry-point source file
         file: PathBuf,
     },
-    /// Reformat source files in place.
+    /// reformat source files in place
     Fmt {
-        /// Files to format. Defaults to the whole project.
+        /// files to format, defaults to the whole project
         files: Vec<PathBuf>,
-        /// Report which files would change instead of writing them.
+        /// report what would change instead of writing it
         #[arg(long)]
         check: bool,
     },
-    /// Run the tests in a program.
+    /// run the tests in a program
     Test {
-        /// Only run tests whose name contains this string.
+        /// only run tests whose name contains this
         filter: Option<String>,
     },
-    /// Print the token stream for a source file. Development aid.
+    /// dump the token stream for a source file. dev aid
     Lex {
-        /// The source file to scan.
+        /// source file to scan
         file: PathBuf,
     },
 }

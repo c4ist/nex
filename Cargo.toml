@@ -16,8 +16,8 @@ rust-version = "1.83"
 [workspace.dependencies]
 nex-lexer = { path = "crates/nex-lexer" }
 nex-syntax = { path = "crates/nex-syntax" }
-# Pinned to the newest releases that still build on our MSRV (1.83). Cargo only
-# became MSRV-aware in 1.84, so these have to be exact.
+# pinned to the newest releases that still build on our msrv (1.83). cargo only
+# became msrv-aware in 1.84 so these have to be exact.
 clap = { version = "=4.5.23", features = ["derive"] }
 insta = "=1.41.1"
 

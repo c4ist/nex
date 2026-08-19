@@ -1,6 +1,6 @@
 use nex_lexer::{tokenize_kinds, TokenKind};
 
-/// The full operator/punctuation table. Each entry is `(source, expected)`.
+/// the full operator/punctuation table, as `(source, expected)`
 const TABLE: &[(&str, TokenKind)] = &[
     ("+", TokenKind::Plus),
     ("-", TokenKind::Minus),
@@ -56,7 +56,7 @@ fn every_operator_lexes_as_a_single_token() {
 
 #[test]
 fn longest_match_wins() {
-    // If maximal munch were broken these would split into shorter operators.
+    // if maximal munch were broken these would split into shorter operators
     assert_eq!(
         tokenize_kinds("== != <= >= && || << >> += -= *= /= -> => .. ..= ::"),
         vec![

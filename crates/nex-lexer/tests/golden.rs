@@ -1,4 +1,4 @@
-//! Snapshot tests over the example programs. Regenerate with:
+//! snapshot tests over the example programs. regenerate with:
 //!
 //! ```text
 //! INSTA_UPDATE=always cargo test -p nex-lexer

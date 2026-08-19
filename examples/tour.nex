@@ -1,5 +1,4 @@
-// A tour of every construct in the Nex v0.1 language sketch.
-// This file is not runnable yet; it exists to exercise the lexer and parser.
+// here to larp also for exercising lexer rn but dw 
 
 struct Point {
     x: f64,

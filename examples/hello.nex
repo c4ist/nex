@@ -1,4 +1,4 @@
-// The traditional greeting.
+// bro come on its hello world 
 fn main() {
     print("hello, world");
 }

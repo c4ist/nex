@@ -1,16 +1,16 @@
 use crate::span::Span;
 use std::fmt;
 
-/// Every distinct lexical unit Nex recognises.
+/// every lexical unit nex recognises
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenKind {
-    // --- identifiers & literals ---
+    // idents + literals
     Ident(String),
     Int(i64),
     Float(f64),
     Str(String),
 
-    // --- keywords ---
+    // keywords
     Fn,
     Let,
     Mut,
@@ -35,7 +35,7 @@ pub enum TokenKind {
     Impl,
     SelfValue,
 
-    // --- arithmetic / bitwise / logical operators ---
+    // arithmetic / bitwise / logical
     Plus,
     Minus,
     Star,
@@ -50,7 +50,7 @@ pub enum TokenKind {
     PipePipe,
     Bang,
 
-    // --- comparison ---
+    // comparison
     Eq,
     EqEq,
     BangEq,
@@ -59,13 +59,13 @@ pub enum TokenKind {
     Gt,
     GtEq,
 
-    // --- compound assignment ---
+    // compound assignment
     PlusEq,
     MinusEq,
     StarEq,
     SlashEq,
 
-    // --- punctuation ---
+    // punctuation
     Arrow,
     FatArrow,
     Dot,
@@ -82,12 +82,12 @@ pub enum TokenKind {
     LBracket,
     RBracket,
 
-    /// End of input. Produced exactly once at the end of a token stream.
+    /// end of input, produced exactly once per stream
     Eof,
 }
 
 impl TokenKind {
-    /// Maps an identifier spelling onto its keyword token, if it is one.
+    /// maps an ident spelling to its keyword token, if it is one
     pub fn keyword_from_str(word: &str) -> Option<TokenKind> {
         use TokenKind::*;
         Some(match word {
@@ -152,7 +152,7 @@ impl TokenKind {
         matches!(self, Int(_) | Float(_) | Str(_) | True | False)
     }
 
-    /// A short, human-readable name used in diagnostics ("expected `;`, found ...").
+    /// name used in diagnostics, e.g. "expected `;`, found ..."
     pub fn describe(&self) -> &'static str {
         use TokenKind::*;
         match self {
@@ -240,7 +240,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
-/// A token: what it is, and where it came from.
+/// what it is, and where it came from
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
