@@ -103,3 +103,27 @@ mdbook serve docs
 ```
 
 Then open http://localhost:3000.
+
+### Deploying to Vercel
+
+The docs site lives in `docs/`, so the Vercel project must be rooted there.
+`docs/vercel.json` carries the build configuration; everything is picked up
+automatically once the root directory is set:
+
+1. Push the repo to GitHub and import it at https://vercel.com/new.
+2. **Root directory: `docs`** — this is the important one. The site's source
+   and its `vercel.json` both live there.
+3. Framework preset: **Other** (leave it as detected; there is no `package.json`).
+4. Build command: `bash ../scripts/build-docs.sh .` — comes from
+   `docs/vercel.json`. The `.` tells the script the book root is the current
+   directory (Vercel runs builds from the project root directory).
+5. Output directory: `book` — comes from `docs/vercel.json`.
+6. Deploy.
+
+The build script downloads a pinned prebuilt mdbook binary (no Rust toolchain
+needed in Vercel's container) and caches it between builds. It works on Linux
+and macOS; to deploy from the CLI instead (from the repo root):
+
+```sh
+npx vercel --prod
+```
