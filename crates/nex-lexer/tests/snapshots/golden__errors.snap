@@ -1,0 +1,18 @@
+---
+source: crates/nex-lexer/tests/golden.rs
+expression: dump_tokens(src)
+snapshot_kind: text
+---
+Let@0..3
+Ident("x")@4..5
+Eq@6..7
+Int(1)@8..10
+Ident("foo")@10..13
+Semi@13..14
+Str("oops")@17..22
+Eof@22..22
+
+-- errors --
+malformed numeric literal@8..10
+unexpected character `@`@15..16
+unterminated string literal@17..22

@@ -1,0 +1,17 @@
+---
+source: crates/nex-lexer/tests/golden.rs
+expression: dump_tokens(src)
+snapshot_kind: text
+---
+Fn@29..31
+Ident("main")@32..36
+LParen@36..37
+RParen@37..38
+LBrace@39..40
+Ident("print")@45..50
+LParen@50..51
+Str("hello, world")@51..65
+RParen@65..66
+Semi@66..67
+RBrace@68..69
+Eof@70..70
