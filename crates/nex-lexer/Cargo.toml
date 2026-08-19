@@ -1,0 +1,12 @@
+[package]
+name = "nex-lexer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Lexical analyzer for the Nex programming language"
+
+[dependencies]
+
+[dev-dependencies]
+insta.workspace = true
