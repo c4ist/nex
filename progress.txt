@@ -1,0 +1,40 @@
+Nex implementation progress
+===========================
+
+Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
+One micro-step per commit. Do not skip ahead.
+
+last_step = 1.11
+current_phase = 1 (lexer) - COMPLETE
+next_step = 2.1 (create crates/nex-syntax, NodeId/Span infrastructure)
+
+Phase status
+------------
+[x] Phase 0  Foundations
+[x] Phase 1  Lexer
+[ ] Phase 2  AST design
+[ ] Phase 3  Parser: expressions
+[ ] Phase 4  Parser: statements & items
+[ ] Phase 5  Tree-walk interpreter
+[ ] Phase 6  Name resolution + type checker
+[ ] Phase 7  Language feature wave 2
+[ ] Phase 8  LLVM backend
+[ ] Phase 9  WASM target
+[ ] Phase 10 Standard library
+[ ] Phase 11 Package manager
+[ ] Phase 12 Editor highlighting
+[ ] Phase 13 Language server
+[ ] Phase 14 Documentation site
+[ ] Phase 15 Polish + v0.1.0
+
+Pending / deferred
+------------------
+- ariadne diagnostics deferred to step 3.11; nex-driver currently uses its own
+  renderer in crates/nex-driver/src/diag.rs.
+- CI does not yet install LLVM; needed from step 8.2.
+- No benchmarks yet; parser throughput baseline is due at step 4.12.
+
+Known test gaps
+---------------
+- No block comments yet (step 7.1), so `/* */` lexes as operators.
+- Character literals ('a') are not in the language.
