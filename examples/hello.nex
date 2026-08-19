@@ -1,0 +1,4 @@
+// The traditional greeting.
+fn main() {
+    print("hello, world");
+}
