@@ -4,15 +4,16 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 1.11
-current_phase = 1 (lexer) - COMPLETE
-next_step = 2.1 (create crates/nex-syntax, NodeId/Span infrastructure)
+last_step = 2.1
+current_phase = 2 (AST design) - in progress
+next_step = 2.2 (expression AST: literals, ident, unary, binary, call, field,
+            index, struct literal, if-expr, block, match, range)
 
 Phase status
 ------------
 [x] Phase 0  Foundations
 [x] Phase 1  Lexer
-[ ] Phase 2  AST design
+[~] Phase 2  AST design      (2.1 done)
 [ ] Phase 3  Parser: expressions
 [ ] Phase 4  Parser: statements & items
 [ ] Phase 5  Tree-walk interpreter
@@ -33,6 +34,14 @@ Pending / deferred
   renderer in crates/nex-driver/src/diag.rs.
 - CI does not yet install LLVM; needed from step 8.2.
 - No benchmarks yet; parser throughput baseline is due at step 4.12.
+
+Design notes
+------------
+- NodeIds are dense and sequential so they can index side tables directly.
+  Later passes must store their results in side tables keyed by NodeId rather
+  than mutating the AST, which stays immutable after parsing.
+- NodeId::DUMMY marks nodes synthesised during error recovery. It deliberately
+  panics on .index() so a dummy can never silently corrupt a side table.
 
 Known test gaps
 ---------------

@@ -1,0 +1,13 @@
+[package]
+name = "nex-syntax"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Abstract syntax tree and parser for the Nex programming language"
+
+[dependencies]
+nex-lexer.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
