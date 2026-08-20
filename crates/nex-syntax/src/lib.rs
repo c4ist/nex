@@ -1,8 +1,5 @@
 //! the nex ast.
 //!
-//! will hold the ast and the parser. so far it's just the bit every node needs:
-//! identity ([`NodeId`]) and location ([`Span`]).
-//!
 //! ```
 //! use nex_syntax::{NodeIdGen, NodeInfo, Span};
 //!

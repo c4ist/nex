@@ -1,12 +1,8 @@
-//! pattern ast.
-//!
-//! just what match needs for now; literal/enum-variant/struct/tuple patterns
-//! land in step 2.6.
+//! pattern ast. just what match needs for now; the rest lands in step 2.6.
 
 use crate::node::{AstNode, HasSpan, Ident, NodeId, NodeInfo};
 use nex_lexer::Span;
 
-/// a single pattern node
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pattern {
     pub info: NodeInfo,
@@ -31,11 +27,8 @@ impl AstNode for Pattern {
     }
 }
 
-/// every pattern form
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind {
-    /// `_`
     Wildcard,
-    /// `v` — binds the matched value
     Binding(Ident),
 }

@@ -33,8 +33,6 @@ fn a_long_run_of_invalid_characters_does_not_overflow_the_stack() {
     assert_eq!(errors.len(), 200_000);
 }
 
-/// tiny deterministic fuzzer. mutate a known-good program a bunch of ways and
-/// check the lexer always terminates, never panics, and always ends with eof.
 #[test]
 fn lexer_never_panics_on_mutated_input() {
     let seed = include_str!("../../../examples/tour.nex");

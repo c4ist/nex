@@ -18,8 +18,6 @@ pub use lexer::Lexer;
 pub use span::Span;
 pub use token::{Token, TokenKind};
 
-/// scans the whole thing. returns every token (ending in eof) plus every
-/// recoverable error we hit along the way
 pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexError>) {
     let mut lexer = Lexer::new(src);
     let mut tokens = Vec::new();
@@ -29,13 +27,10 @@ pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexError>) {
     (tokens, lexer.into_errors())
 }
 
-/// same but drops the spans. handy for tests that only care about the shape
 pub fn tokenize_kinds(src: &str) -> Vec<TokenKind> {
     tokenize(src).0.into_iter().map(|t| t.kind).collect()
 }
 
-/// one `Kind@start..end` line per token
-///
 /// used by the snapshot tests and `nex lex`, so keep the format stable
 pub fn dump_tokens(src: &str) -> String {
     let (tokens, errors) = tokenize(src);

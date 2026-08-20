@@ -5,35 +5,27 @@ use crate::pattern::Pattern;
 use crate::stmt::Stmt;
 use nex_lexer::Span;
 
-/// unary operators
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOp {
-    /// `-x`
     Neg,
-    /// `!x`
     Not,
 }
 
-/// binary operators
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
-    // logical
     Or,
     And,
-    // comparison
     Eq,
     Ne,
     Lt,
     Le,
     Gt,
     Ge,
-    // bitwise
     BitOr,
     BitXor,
     BitAnd,
     Shl,
     Shr,
-    // arithmetic
     Add,
     Sub,
     Mul,
@@ -41,7 +33,6 @@ pub enum BinaryOp {
     Rem,
 }
 
-/// a single expression node
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
     pub info: NodeInfo,
@@ -66,62 +57,49 @@ impl AstNode for Expr {
     }
 }
 
-/// every expression form in the language sketch
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind {
-    /// `5`, `1.5`, `"hi"`, `true`, `()`
     Int(i64),
     Float(f64),
     Str(String),
     Bool(bool),
     Unit,
-    /// a bare name
     Ident(Ident),
-    /// `-x`, `!x`
     Unary {
         op: Spanned<UnaryOp>,
         operand: Box<Expr>,
     },
-    /// `a + b`
     Binary {
         op: Spanned<BinaryOp>,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
-    /// `f(x, y)`
     Call {
         callee: Box<Expr>,
         args: Vec<Expr>,
     },
-    /// `p.x`
     Field {
         base: Box<Expr>,
         field: Ident,
     },
-    /// `xs[0]`
     Index {
         base: Box<Expr>,
         index: Box<Expr>,
     },
-    /// `Point { x: 1.0, y: 2.0 }`
     StructLit {
         name: Ident,
         fields: Vec<FieldInit>,
     },
-    /// `if c { a } else { b }`; `else` optional
     If {
         cond: Box<Expr>,
         then: Box<Expr>,
         else_: Option<Box<Expr>>,
     },
-    /// `{ stmts }`
     Block(Block),
-    /// `match x { pat => body, ... }`
     Match {
         scrutinee: Box<Expr>,
         arms: Vec<MatchArm>,
     },
-    /// `a..b`, `a..=b`
     Range {
         start: Box<Expr>,
         end: Box<Expr>,
@@ -129,7 +107,6 @@ pub enum ExprKind {
     },
 }
 
-/// one `name: value` entry in a struct literal
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldInit {
     pub info: NodeInfo,
@@ -155,7 +132,7 @@ impl AstNode for FieldInit {
     }
 }
 
-/// a `{ ... }` block. its value is the last expression statement
+/// its value is the last expression statement
 #[derive(Clone, Debug, PartialEq)]
 pub struct Block {
     pub info: NodeInfo,
@@ -180,7 +157,6 @@ impl AstNode for Block {
     }
 }
 
-/// one `pattern => body` arm of a match
 #[derive(Clone, Debug, PartialEq)]
 pub struct MatchArm {
     pub info: NodeInfo,

@@ -1,16 +1,13 @@
 use crate::span::Span;
 use std::fmt;
 
-/// every lexical unit nex recognises
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenKind {
-    // idents + literals
     Ident(String),
     Int(i64),
     Float(f64),
     Str(String),
 
-    // keywords
     Fn,
     Let,
     Mut,
@@ -35,7 +32,6 @@ pub enum TokenKind {
     Impl,
     SelfValue,
 
-    // arithmetic / bitwise / logical
     Plus,
     Minus,
     Star,
@@ -50,7 +46,6 @@ pub enum TokenKind {
     PipePipe,
     Bang,
 
-    // comparison
     Eq,
     EqEq,
     BangEq,
@@ -59,13 +54,11 @@ pub enum TokenKind {
     Gt,
     GtEq,
 
-    // compound assignment
     PlusEq,
     MinusEq,
     StarEq,
     SlashEq,
 
-    // punctuation
     Arrow,
     FatArrow,
     Dot,
@@ -82,12 +75,10 @@ pub enum TokenKind {
     LBracket,
     RBracket,
 
-    /// end of input, produced exactly once per stream
     Eof,
 }
 
 impl TokenKind {
-    /// maps an ident spelling to its keyword token, if it is one
     pub fn keyword_from_str(word: &str) -> Option<TokenKind> {
         use TokenKind::*;
         Some(match word {
@@ -152,7 +143,6 @@ impl TokenKind {
         matches!(self, Int(_) | Float(_) | Str(_) | True | False)
     }
 
-    /// name used in diagnostics, e.g. "expected `;`, found ..."
     pub fn describe(&self) -> &'static str {
         use TokenKind::*;
         match self {
@@ -240,7 +230,6 @@ impl fmt::Display for TokenKind {
     }
 }
 
-/// what it is, and where it came from
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,

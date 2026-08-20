@@ -11,28 +11,20 @@
 use nex_lexer::Span;
 use std::fmt;
 
-/// a node's identity within one parsed module
-///
-/// ids are dense and handed out in order by [`NodeIdGen`], so they double as
-/// indices into side tables (`Vec<T>` keyed by `id.index()`)
+/// dense ids handed out in order by [`NodeIdGen`], so they double as indices
+/// into side tables (`Vec<T>` keyed by `id.index()`)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(u32);
 
 impl NodeId {
-    /// placeholder for nodes we invent during error recovery, which don't
-    /// correspond to anything the user actually wrote
+    /// placeholder for nodes invented during error recovery
     pub const DUMMY: NodeId = NodeId(u32::MAX);
 
-    /// raw index. only [`NodeIdGen`] should be building ids directly
     pub fn as_u32(self) -> u32 {
         self.0
     }
 
-    /// slot in a side table keyed by node id
-    ///
-    /// # panics
-    ///
-    /// on [`NodeId::DUMMY`], which has no slot
+    /// panics on [`NodeId::DUMMY`], which has no slot
     pub fn index(self) -> usize {
         assert!(!self.is_dummy(), "NodeId::DUMMY has no side-table index");
         self.0 as usize
@@ -53,7 +45,6 @@ impl fmt::Debug for NodeId {
     }
 }
 
-/// hands out fresh ids while parsing one module
 #[derive(Debug, Default)]
 pub struct NodeIdGen {
     next: u32,
@@ -64,12 +55,6 @@ impl NodeIdGen {
         NodeIdGen::default()
     }
 
-    /// next unused id
-    ///
-    /// # panics
-    ///
-    /// past `u32::MAX - 1` nodes, since that would collide with
-    /// [`NodeId::DUMMY`]. not a file size worth handling gracefully.
     pub fn fresh(&mut self) -> NodeId {
         assert!(self.next < u32::MAX, "exhausted the NodeId space");
         let id = NodeId(self.next);
@@ -77,13 +62,12 @@ impl NodeIdGen {
         id
     }
 
-    /// how many ids we've handed out, ie. the length a side table needs
+    /// how many ids handed out; the length a side table needs
     pub fn allocated(&self) -> usize {
         self.next as usize
     }
 }
 
-/// the identity + location every ast node embeds
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct NodeInfo {
     pub id: NodeId,
@@ -95,7 +79,6 @@ impl NodeInfo {
         NodeInfo { id, span }
     }
 
-    /// a node that isn't in the source, for error recovery
     pub fn dummy(span: Span) -> Self {
         NodeInfo {
             id: NodeId::DUMMY,
@@ -110,12 +93,10 @@ impl fmt::Debug for NodeInfo {
     }
 }
 
-/// anything that knows where it came from
 pub trait HasSpan {
     fn span(&self) -> Span;
 }
 
-/// a spanned thing that also has an identity
 pub trait AstNode: HasSpan {
     fn id(&self) -> NodeId;
 
@@ -136,8 +117,7 @@ impl AstNode for NodeInfo {
     }
 }
 
-/// attaches a span to a value that doesn't need its own identity, like an
-/// ident, a field name or an operator
+/// a value plus a span; for idents, field names, operators
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Spanned<T> {
     pub value: T,
@@ -149,7 +129,6 @@ impl<T> Spanned<T> {
         Spanned { value, span }
     }
 
-    /// map the value, keep the span
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
         Spanned {
             value: f(self.value),
@@ -177,11 +156,8 @@ impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     }
 }
 
-/// an identifier as written in the source
 pub type Ident = Spanned<String>;
 
-/// smallest span covering every element, or `fallback` if there are none
-///
 /// used to give a parent node a span derived from its children
 pub fn spanning<T: HasSpan>(items: &[T], fallback: Span) -> Span {
     let mut iter = items.iter();

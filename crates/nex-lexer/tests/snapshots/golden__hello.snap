@@ -3,15 +3,15 @@ source: crates/nex-lexer/tests/golden.rs
 expression: dump_tokens(src)
 snapshot_kind: text
 ---
-Fn@32..34
-Ident("main")@35..39
-LParen@39..40
-RParen@40..41
-LBrace@42..43
-Ident("print")@48..53
-LParen@53..54
-Str("hello, world")@54..68
-RParen@68..69
-Semi@69..70
-RBrace@71..72
-Eof@73..73
+Fn@0..2
+Ident("main")@3..7
+LParen@7..8
+RParen@8..9
+LBrace@10..11
+Ident("print")@16..21
+LParen@21..22
+Str("hello, world")@22..36
+RParen@36..37
+Semi@37..38
+RBrace@39..40
+Eof@41..41

@@ -12,7 +12,6 @@ pub struct Diagnostic {
     pub help: Option<String>,
 }
 
-/// renders diagnostics against `src`, annotating the offending lines
 pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
     let mut out = String::new();
     for diagnostic in diagnostics {
@@ -26,7 +25,6 @@ pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
         let _ = writeln!(out, "{pad} |");
         let _ = writeln!(out, "{line_no} | {line_text}");
 
-        // underline the span, clamped to this line
         let start_col = diagnostic.span.start as usize - line_start;
         let end_on_line = (diagnostic.span.end as usize).min(line_start + line_text.len());
         let width = end_on_line
@@ -47,8 +45,7 @@ pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
     out
 }
 
-/// `(line, col, line_start_offset, line_text)` for a byte offset. line and col
-/// are 1-based
+/// line and col are 1-based
 fn locate(src: &str, offset: usize) -> (usize, usize, usize, &str) {
     let offset = offset.min(src.len());
     let line_start = src[..offset].rfind('\n').map(|i| i + 1).unwrap_or(0);

@@ -2,16 +2,12 @@ use crate::error::{LexError, LexErrorKind};
 use crate::span::Span;
 use crate::token::{Token, TokenKind};
 
-/// hand-written scanner over a utf-8 source string
-///
 /// never panics and never stops early. recoverable problems get pushed onto
 /// `errors` and scanning continues, so one run reports every lexical error in
 /// the file.
 pub struct Lexer<'src> {
     src: &'src str,
-    /// byte offset of the next char to consume
     pos: usize,
-    /// set once eof has been handed out
     finished: bool,
     errors: Vec<LexError>,
 }
@@ -34,8 +30,6 @@ impl<'src> Lexer<'src> {
         self.errors
     }
 
-    // cursor
-
     fn peek(&self) -> Option<char> {
         self.src[self.pos..].chars().next()
     }
@@ -50,7 +44,6 @@ impl<'src> Lexer<'src> {
         Some(c)
     }
 
-    /// consumes the next char if it matches
     fn eat(&mut self, expected: char) -> bool {
         if self.peek() == Some(expected) {
             self.pos += expected.len_utf8();
@@ -68,9 +61,6 @@ impl<'src> Lexer<'src> {
         self.errors.push(LexError::new(kind, span));
     }
 
-    // trivia
-
-    /// skips whitespace and `//` comments until real content
     fn skip_trivia(&mut self) {
         loop {
             match self.peek() {
@@ -90,9 +80,7 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    // tokens
-
-    /// next token. returns `None` only after eof has already been handed out
+    /// returns `None` only after eof has already been handed out
     pub fn next_token(&mut self) -> Option<Token> {
         if self.finished {
             return None;
@@ -121,7 +109,6 @@ impl<'src> Lexer<'src> {
                     None => {
                         let span = Span::from_usize(start, self.pos);
                         self.error(LexErrorKind::UnknownChar(c), span);
-                        // skip it and keep going
                         continue;
                     }
                 },
@@ -142,8 +129,6 @@ impl<'src> Lexer<'src> {
         let word = &self.src[start..self.pos];
         TokenKind::keyword_from_str(word).unwrap_or_else(|| TokenKind::Ident(word.to_string()))
     }
-
-    // numbers
 
     fn number(&mut self, start: usize, first: char) -> TokenKind {
         if first == '0' {
@@ -234,7 +219,6 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    /// digits after an already-consumed `0x`/`0b`/`0o` prefix
     fn radix_number(&mut self, start: usize, radix: u32) -> TokenKind {
         let digits_start = self.pos;
         self.eat_digits(radix);
@@ -258,7 +242,6 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    /// eats digits valid in `radix`, `_` allowed as a separator
     fn eat_digits(&mut self, radix: u32) {
         while let Some(c) = self.peek() {
             if c == '_' || c.is_digit(radix) {
@@ -268,8 +251,6 @@ impl<'src> Lexer<'src> {
             }
         }
     }
-
-    // strings
 
     fn string(&mut self, start: usize) -> TokenKind {
         let mut value = String::new();
@@ -298,7 +279,6 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    /// handles whatever follows a `\` inside a string
     fn escape(&mut self, esc_start: usize, out: &mut String) {
         let Some(c) = self.bump() else {
             return;
@@ -334,9 +314,6 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    // operators
-
-    /// operators and punctuation, longest match first
     fn operator(&mut self, c: char) -> Option<TokenKind> {
         use TokenKind::*;
         Some(match c {

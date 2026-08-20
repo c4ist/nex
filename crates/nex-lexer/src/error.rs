@@ -1,22 +1,15 @@
 use crate::span::Span;
 use std::fmt;
 
-/// what went wrong while scanning
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LexErrorKind {
-    /// char that can't start any token
     UnknownChar(char),
-    /// string ran to end of line or end of file
     UnterminatedString,
-    /// `\q` and friends
     InvalidEscape(char),
-    /// `\x` without two hex digits after it
     InvalidHexEscape,
     /// `0x`/`0b` with no digits, or `1.` followed by a non-digit
     MalformedNumber,
-    /// doesn't fit in `i64`
     IntegerOverflow,
-    /// couldn't parse the float
     InvalidFloat,
 }
 
@@ -38,7 +31,7 @@ impl fmt::Display for LexErrorKind {
     }
 }
 
-/// a recoverable lexing error. the lexer never stops on one of these
+/// the lexer never stops on one of these
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LexError {
     pub kind: LexErrorKind,
@@ -50,7 +43,6 @@ impl LexError {
         LexError { kind, span }
     }
 
-    /// short hint shown under the offending span
     pub fn help(&self) -> Option<&'static str> {
         match self.kind {
             LexErrorKind::UnterminatedString => Some("add a closing `\"`"),

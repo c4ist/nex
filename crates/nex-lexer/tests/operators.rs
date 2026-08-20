@@ -1,6 +1,5 @@
 use nex_lexer::{tokenize_kinds, TokenKind};
 
-/// the full operator/punctuation table, as `(source, expected)`
 const TABLE: &[(&str, TokenKind)] = &[
     ("+", TokenKind::Plus),
     ("-", TokenKind::Minus),

@@ -18,7 +18,6 @@ impl Span {
         Span::new(start as u32, end as u32)
     }
 
-    /// smallest span that covers both
     pub fn merge(self, other: Span) -> Span {
         Span::new(self.start.min(other.start), self.end.max(other.end))
     }
@@ -35,7 +34,7 @@ impl Span {
         self.start as usize..self.end as usize
     }
 
-    /// the text this span covers. `src` must be the file it came from
+    /// `src` must be the file this span came from
     pub fn text(self, src: &str) -> &str {
         &src[self.range()]
     }

@@ -1,13 +1,9 @@
-//! statement ast.
-//!
-//! just what blocks need for now; let/return/while/for-in/break/continue land
-//! in step 2.3.
+//! statement ast. just what blocks need for now; the rest lands in step 2.3.
 
 use crate::expr::Expr;
 use crate::node::{AstNode, HasSpan, NodeId, NodeInfo};
 use nex_lexer::Span;
 
-/// a single statement node
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stmt {
     pub info: NodeInfo,
@@ -32,9 +28,7 @@ impl AstNode for Stmt {
     }
 }
 
-/// every statement form
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtKind {
-    /// `foo();`
     Expr(Expr),
 }
