@@ -1,0 +1,42 @@
+---
+source: crates/nex-syntax/tests/expr_debug.rs
+expression: expr
+snapshot_kind: text
+---
+Expr {
+    info: #5@0..18,
+    kind: Binary {
+        op: Add@1..2,
+        lhs: Expr {
+            info: #0@0..1,
+            kind: Int(
+                1,
+            ),
+        },
+        rhs: Expr {
+            info: #4@4..18,
+            kind: Call {
+                callee: Expr {
+                    info: #2@4..10,
+                    kind: Field {
+                        base: Expr {
+                            info: #1@4..5,
+                            kind: Ident(
+                                "p"@4..5,
+                            ),
+                        },
+                        field: "dist"@6..10,
+                    },
+                },
+                args: [
+                    Expr {
+                        info: #3@11..17,
+                        kind: Ident(
+                            "origin"@11..17,
+                        ),
+                    },
+                ],
+            },
+        },
+    },
+}

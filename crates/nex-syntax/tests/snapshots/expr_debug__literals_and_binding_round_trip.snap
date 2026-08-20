@@ -1,0 +1,33 @@
+---
+source: crates/nex-syntax/tests/expr_debug.rs
+expression: expr
+snapshot_kind: text
+---
+Expr {
+    info: #4@0..18,
+    kind: Match {
+        scrutinee: Expr {
+            info: #0@0..4,
+            kind: Bool(
+                true,
+            ),
+        },
+        arms: [
+            MatchArm {
+                info: #3@8..17,
+                pattern: Pattern {
+                    info: #1@8..9,
+                    kind: Binding(
+                        "v"@8..9,
+                    ),
+                },
+                body: Expr {
+                    info: #2@13..17,
+                    kind: Str(
+                        "hi",
+                    ),
+                },
+            },
+        ],
+    },
+}

@@ -1,0 +1,131 @@
+---
+source: crates/nex-syntax/tests/expr_debug.rs
+expression: expr
+snapshot_kind: text
+---
+Expr {
+    info: #22@0..67,
+    kind: If {
+        cond: Expr {
+            info: #2@0..6,
+            kind: Binary {
+                op: Gt@3..4,
+                lhs: Expr {
+                    info: #0@0..1,
+                    kind: Ident(
+                        "x"@0..1,
+                    ),
+                },
+                rhs: Expr {
+                    info: #1@5..6,
+                    kind: Int(
+                        0,
+                    ),
+                },
+            },
+        },
+        then: Expr {
+            info: #10@10..36,
+            kind: Block(
+                Block {
+                    info: #9@10..36,
+                    stmts: [
+                        Stmt {
+                            info: #8@12..34,
+                            kind: Expr(
+                                Expr {
+                                    info: #7@12..34,
+                                    kind: StructLit {
+                                        name: "Point"@12..17,
+                                        fields: [
+                                            FieldInit {
+                                                info: #4@19..25,
+                                                name: "x"@19..20,
+                                                value: Expr {
+                                                    info: #3@22..25,
+                                                    kind: Float(
+                                                        1.0,
+                                                    ),
+                                                },
+                                            },
+                                            FieldInit {
+                                                info: #6@27..33,
+                                                name: "y"@27..28,
+                                                value: Expr {
+                                                    info: #5@30..33,
+                                                    kind: Float(
+                                                        2.0,
+                                                    ),
+                                                },
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+        },
+        else_: Some(
+            Expr {
+                info: #21@44..67,
+                kind: Block(
+                    Block {
+                        info: #20@44..67,
+                        stmts: [
+                            Stmt {
+                                info: #19@52..65,
+                                kind: Expr(
+                                    Expr {
+                                        info: #18@52..65,
+                                        kind: Match {
+                                            scrutinee: Expr {
+                                                info: #13@46..51,
+                                                kind: Index {
+                                                    base: Expr {
+                                                        info: #11@46..48,
+                                                        kind: Ident(
+                                                            "xs"@46..48,
+                                                        ),
+                                                    },
+                                                    index: Expr {
+                                                        info: #12@49..50,
+                                                        kind: Int(
+                                                            0,
+                                                        ),
+                                                    },
+                                                },
+                                            },
+                                            arms: [
+                                                MatchArm {
+                                                    info: #17@57..64,
+                                                    pattern: Pattern {
+                                                        info: #14@57..58,
+                                                        kind: Wildcard,
+                                                    },
+                                                    body: Expr {
+                                                        info: #16@62..64,
+                                                        kind: Unary {
+                                                            op: Neg@62..63,
+                                                            operand: Expr {
+                                                                info: #15@63..64,
+                                                                kind: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                ),
+            },
+        ),
+    },
+}
