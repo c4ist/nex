@@ -1,16 +1,3 @@
-#!/usr/bin/env bash
-# build the mdbook docs site for deployment (vercel, ci, whatever).
-#
-# downloads a pinned prebuilt mdbook binary instead of compiling it, so the
-# build does not need a rust toolchain. keep MDBOOK_VERSION in sync with the
-# mdbook you use locally (cargo install mdbook --version 0.4.52).
-#
-# usage: ./scripts/build-docs.sh [book-root]
-#
-# book-root defaults to `docs`, so from the repo root you can run
-# ./scripts/build-docs.sh. vercel runs it as `bash ../scripts/build-docs.sh .`
-# with the project root directory set to `docs`.
-
 set -euo pipefail
 
 MDBOOK_VERSION="0.4.52"
