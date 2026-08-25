@@ -72,8 +72,9 @@ Consequence for future passes: type information, resolved names, and lowering
 results all live in side tables keyed by `NodeId`, never in the tree itself.
 
 The AST now covers expressions, statements, items (fn/struct/enum/use/mod/impl
-stub) and types (named/generic/array/reference/fn); patterns beyond
-wildcard/binding are the last piece, landing in step 2.6.
+stub), types (named/generic/array/reference/fn), and patterns
+(wildcard/binding/literal/enum-variant/struct/tuple) — the full node set
+phase 2 set out to define.
 
 ## The CLI (`nex-driver`)
 

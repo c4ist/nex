@@ -1,0 +1,33 @@
+---
+source: crates/nex-syntax/tests/pattern_debug.rs
+expression: pat
+snapshot_kind: text
+---
+Pattern {
+    info: #4@0..23,
+    kind: Struct {
+        name: "Point"@0..5,
+        fields: [
+            FieldPattern {
+                info: #1@9..14,
+                name: "x"@9..10,
+                pattern: Pattern {
+                    info: #0@12..14,
+                    kind: Binding(
+                        "px"@12..14,
+                    ),
+                },
+            },
+            FieldPattern {
+                info: #3@16..21,
+                name: "y"@16..17,
+                pattern: Pattern {
+                    info: #2@19..21,
+                    kind: Binding(
+                        "py"@19..21,
+                    ),
+                },
+            },
+        ],
+    },
+}

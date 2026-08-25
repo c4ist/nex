@@ -10,10 +10,10 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 2.5
+- **last step:** 2.6
 - **current phase:** 2 (AST design) — in progress
-- **next step:** 2.6 — pattern AST for match (wildcard, literal, binding,
-  enum-variant, struct, tuple)
+- **next step:** 2.7 — pretty printer: AST → s-expression string, for
+  snapshot tests
 
 ## Phase status
 
@@ -42,7 +42,8 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 - **1 — Lexer:** full token stream with error recovery (done; see the
   [lexical structure reference](/reference/lexical-structure/)).
 - **2 — AST design:** node identity (`NodeId`), spans, and the expression,
-  statement, item, and type node types (done). Patterns follow.
+  statement, item, type, and pattern node types (done). A pretty printer and
+  coverage review close out the phase.
 - **3–4 — Parser:** expressions first, then statements and items, with error
   recovery and `ariadne` diagnostics (step 3.11).
 - **5 — Tree-walking interpreter:** `nex run`.
