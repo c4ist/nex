@@ -24,7 +24,10 @@ export default defineConfig({
 				},
 				{
 					label: 'Internals',
-					items: [{ label: 'Architecture', slug: 'internals/architecture' }],
+					items: [
+						{ label: 'Architecture', slug: 'internals/architecture' },
+						{ label: 'AST Coverage', slug: 'internals/ast-coverage' },
+					],
 				},
 				{ label: 'Roadmap', slug: 'roadmap' },
 			],

@@ -10,10 +10,10 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 2.7
-- **current phase:** 2 (AST design) — in progress
-- **next step:** 2.8 — review pass: walk every node against
-  `language-design.md`, list unsupported-yet constructs
+- **last step:** 2.8
+- **current phase:** 3 (Parser: expressions) — starting
+- **next step:** 3.1 — parser scaffolding: `Parser` struct over `Vec<Token>`,
+  `peek`/`advance`/`expect`, `ParseError` with spans
 
 ## Phase status
 
@@ -21,7 +21,7 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 | ----- | ------------------------------------ | ----------- |
 | 0     | Foundations                        | done        |
 | 1     | Lexer                              | done        |
-| 2     | AST design                         | in progress |
+| 2     | AST design                         | done        |
 | 3     | Parser: expressions                | planned     |
 | 4     | Parser: statements & items         | planned     |
 | 5     | Tree-walking interpreter           | planned     |
@@ -41,9 +41,10 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 - **0 — Foundations:** workspace, CI, examples, progress tracking.
 - **1 — Lexer:** full token stream with error recovery (done; see the
   [lexical structure reference](/reference/lexical-structure/)).
-- **2 — AST design:** node identity (`NodeId`), spans, and the expression,
-  statement, item, type, and pattern node types, plus an s-expression pretty
-  printer for snapshot tests (done). A coverage review closes out the phase.
+- **2 — AST design:** node identity (`NodeId`), spans, the expression,
+  statement, item, type, and pattern node types, an s-expression pretty
+  printer, and a coverage review against the spec (done; see
+  [AST Coverage](/internals/ast-coverage/) for what's still missing).
 - **3–4 — Parser:** expressions first, then statements and items, with error
   recovery and `ariadne` diagnostics (step 3.11).
 - **5 — Tree-walking interpreter:** `nex run`.

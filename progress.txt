@@ -4,17 +4,17 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 2.7
-current_phase = 2 (AST design) - in progress
-next_step = 2.8 (review pass: walk every node against language-design.md;
-            list unsupported-yet constructs in docs/src/content/docs/
-            ast-coverage.md)
+last_step = 2.8
+current_phase = 3 (Parser: expressions) - starting
+next_step = 3.1 (parser scaffolding: Parser struct over Vec<Token>,
+            peek/advance/expect, ParseError with spans. verify: parses
+            empty file to empty module)
 
 Phase status
 ------------
 [x] Phase 0  Foundations
 [x] Phase 1  Lexer
-[~] Phase 2  AST design      (2.1-2.7 done)
+[x] Phase 2  AST design
 [ ] Phase 3  Parser: expressions
 [ ] Phase 4  Parser: statements & items
 [ ] Phase 5  Tree-walk interpreter
@@ -35,6 +35,13 @@ Pending / deferred
   renderer in crates/nex-driver/src/diag.rs.
 - CI does not yet install LLVM; needed from step 8.2.
 - No benchmarks yet; parser throughput baseline is due at step 4.12.
+- step 2.8 coverage review (docs/src/content/docs/internals/ast-coverage.md)
+  found real AST gaps beyond the already-tracked ones above: no path-qualified
+  EXPRESSION (`Option::Some` can't be written as an Expr - the spec's own
+  match sample can't be represented yet), no assignment/compound-assignment
+  statement (deferred to parser step 4.2 on purpose), no `const` item, no
+  `type` alias item, no TypeKind::Unit for the `()` type. See the doc for
+  the full list and reasoning.
 
 Design notes
 ------------
