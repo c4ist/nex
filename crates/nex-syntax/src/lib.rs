@@ -22,7 +22,7 @@ pub use expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
 pub use item::{Enum, FieldDef, Fn, Impl, Item, ItemKind, Mod, Param, Struct, Use, Variant};
 pub use module::Module;
 pub use node::{spanning, AstNode, HasSpan, Ident, NodeId, NodeIdGen, NodeInfo, Spanned};
-pub use parser::{parse_module, ParseError, Parser};
+pub use parser::{parse_expr, parse_module, ParseError, Parser};
 pub use pattern::{FieldPattern, Pattern, PatternKind};
 pub use pretty::{print_expr, print_item, print_pattern, print_stmt, print_type};
 pub use stmt::{Stmt, StmtKind};
