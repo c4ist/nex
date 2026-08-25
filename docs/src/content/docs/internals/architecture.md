@@ -1,15 +1,20 @@
-# Compiler Architecture
+---
+title: Compiler Architecture
+description: Workspace layout and the design decisions already locked in.
+---
 
-> **Status: foundations in place.** This page describes the workspace layout
-> and the design decisions that are already locked in. The parser and all later
-> passes are planned but not yet written.
+:::note[Status: foundations in place]
+This page describes the workspace layout and the design decisions that
+are already locked in. The parser and all later passes are planned but
+not yet written.
+:::
 
 ## Workspace layout
 
 Nex is a Cargo workspace with three crates:
 
 | Crate            | Responsibility                         | Dependencies              |
-| ---------------- | -------------------------------------- | ------------------------- |
+| ----------------- | --------------------------------------- | -------------------------- |
 | `nex-lexer`      | source text → tokens (Phase 1, done)   | none                      |
 | `nex-syntax`     | AST types and the future parser        | `nex-lexer` (for `Span`)  |
 | `nex-driver`     | the `nex` CLI                          | `nex-lexer`, `clap`       |
@@ -19,7 +24,7 @@ Cargo only became MSRV-aware in 1.84 and the workspace MSRV is 1.83.
 
 ## The compilation pipeline
 
-```
+```text
 source text
    │  nex-lexer          (Phase 1 — done)
    ▼
@@ -66,6 +71,10 @@ Key types:
 Consequence for future passes: type information, resolved names, and lowering
 results all live in side tables keyed by `NodeId`, never in the tree itself.
 
+The AST now covers expressions, statements, items (fn/struct/enum/use/mod/impl
+stub) and types (named/generic/array/reference/fn); patterns beyond
+wildcard/binding are the last piece, landing in step 2.6.
+
 ## The CLI (`nex-driver`)
 
 `nex` is a clap-based CLI. The full command surface exists (`build`, `run`,
@@ -83,7 +92,9 @@ the parser starts producing richer diagnostics.
 - **Unit tests** live next to the code (lexer, spans, node plumbing).
 - **Integration tests** in `crates/nex-lexer/tests/` cover literals, operators,
   trivia and keywords, recovery, plus an insta snapshot suite (`golden.rs`)
-  that lexes the `examples/` programs and freezes the output.
+  that lexes the `examples/` programs and freezes the output. `nex-syntax`
+  has its own `Debug`-round-trip snapshot suites per node family
+  (`expr_debug.rs`, `stmt_debug.rs`, `item_debug.rs`, `type_debug.rs`).
 - **Robustness tests**: a deterministic mutation fuzzer (xorshift, no external
   deps) runs 2 000 mutated copies of `examples/tour.nex` and asserts the lexer
   always terminates, never panics, and always ends with `Eof`.

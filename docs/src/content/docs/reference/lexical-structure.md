@@ -1,7 +1,12 @@
-# Lexical Structure
+---
+title: Lexical Structure
+description: The token and error catalogue implemented by crates/nex-lexer.
+---
 
-> **Status: complete.** This page documents the lexer as implemented in
-> `crates/nex-lexer` (Phase 1, done). Everything here is covered by tests.
+:::tip[Status: complete]
+This page documents the lexer as implemented in `crates/nex-lexer`
+(Phase 1, done). Everything here is covered by tests.
+:::
 
 The lexer is a hand-written scanner over a UTF-8 source string. It is
 non-panicking and never stops early: recoverable problems are collected and
@@ -27,7 +32,7 @@ Keywords are recognised by spelling; a keyword prefix is an ordinary identifier
 
 The 23 reserved words:
 
-```
+```text
 fn let mut if else for while return struct enum match
 use mod pub true false in break continue const type impl self
 ```
@@ -89,7 +94,7 @@ Matched longest-first:
 All lexer errors are recoverable; the lexer reports every instance in one run.
 
 | Error                  | Meaning                                         | Help shown |
-| ---------------------- | ----------------------------------------------- | ---------- |
+| ----------------------- | ------------------------------------------------ | ----------- |
 | `UnknownChar(c)`       | character that can't start any token            | —          |
 | `UnterminatedString`   | string ran to end of line or end of file        | add a closing `"` |
 | `InvalidEscape(c)`     | unknown escape sequence `\c`                    | lists valid escapes |

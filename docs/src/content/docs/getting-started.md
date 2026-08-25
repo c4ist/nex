@@ -1,4 +1,7 @@
-# Getting Started
+---
+title: Getting Started
+description: Build the nex compiler, run the lexer, and find your way around the CLI and docs site.
+---
 
 ## Requirements
 
@@ -66,7 +69,7 @@ error: unexpected character `@`
 ```
 
 The lexer never stops early: one run reports *every* lexical error in the file.
-See the [lexical structure reference](reference/lexical-structure.md) for the
+See the [lexical structure reference](/reference/lexical-structure/) for the
 full token and error catalogue.
 
 ## Example programs
@@ -85,7 +88,7 @@ The CLI defines the full command surface, but every subcommand except `lex`
 returns "not implemented yet" with the phase it arrives in:
 
 | Command             | Purpose                              | Arrives in |
-| ------------------- | ------------------------------------ | ---------- |
+| -------------------- | ------------------------------------ | ---------- |
 | `nex build [--out]` | compile to a native executable       | Phase 8 (LLVM backend) |
 | `nex run`           | type-check and run a program         | Phase 5 (interpreter) |
 | `nex check`         | type-check without running           | Phase 6 (type checker) |
@@ -94,36 +97,22 @@ returns "not implemented yet" with the phase it arrives in:
 
 ## Building the docs site
 
-The docs are written as an [mdBook](https://rust-lang.github.io/mdBook/)
-project. To render them locally:
+This site is a [Starlight](https://starlight.astro.build) project under
+`docs/`. To render it locally:
 
 ```sh
-cargo install mdbook
-mdbook serve docs
+cd docs
+npm install
+npm run dev
 ```
 
-Then open http://localhost:3000.
+Then open http://localhost:4321.
 
 ### Deploying to Vercel
 
-The docs site lives in `docs/`, so the Vercel project must be rooted there.
-`docs/vercel.json` carries the build configuration; everything is picked up
-automatically once the root directory is set:
+The docs site lives in `docs/`, so the Vercel project must be rooted there:
 
 1. Push the repo to GitHub and import it at https://vercel.com/new.
-2. **Root directory: `docs`** — this is the important one. The site's source
-   and its `vercel.json` both live there.
-3. Framework preset: **Other** (leave it as detected; there is no `package.json`).
-4. Build command: `bash ../scripts/build-docs.sh .` — comes from
-   `docs/vercel.json`. The `.` tells the script the book root is the current
-   directory (Vercel runs builds from the project root directory).
-5. Output directory: `book` — comes from `docs/vercel.json`.
-6. Deploy.
-
-The build script downloads a pinned prebuilt mdbook binary (no Rust toolchain
-needed in Vercel's container) and caches it between builds. It works on Linux
-and macOS; to deploy from the CLI instead (from the repo root):
-
-```sh
-npx vercel --prod
-```
+2. **Root directory: `docs`** — this is the important one.
+3. Framework preset: **Astro** (auto-detected from `package.json`).
+4. Deploy.

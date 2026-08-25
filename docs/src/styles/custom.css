@@ -1,0 +1,106 @@
+/* nex docs theme. overrides starlight's design tokens (see
+   @astrojs/starlight/style/props.css for the full token set) rather than
+   fighting its layout - same approach as overriding CSS custom properties
+   anywhere else: redefine the token, let every component that consumes it
+   update automatically. */
+
+@import '@fontsource-variable/inter';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+:root {
+  --sl-font: 'Inter Variable', var(--sl-font-system);
+  --sl-font-mono: 'JetBrains Mono', var(--sl-font-system-mono);
+}
+
+/* dark mode (starlight's default :root scope - one accent hue, indigo,
+   reused everywhere something is interactive or "active" so it keeps one
+   meaning across the site) */
+:root {
+  --sl-color-white: oklch(0.97 0.005 260);
+  --sl-color-gray-1: oklch(0.88 0.012 260);
+  --sl-color-gray-2: oklch(0.76 0.015 260);
+  --sl-color-gray-3: oklch(0.6 0.018 260);
+  --sl-color-gray-4: oklch(0.44 0.02 260);
+  --sl-color-gray-5: oklch(0.3 0.02 260);
+  --sl-color-gray-6: oklch(0.21 0.018 260);
+  --sl-color-black: oklch(0.15 0.016 260);
+
+  --sl-color-accent-low: oklch(0.3 0.09 265);
+  --sl-color-accent: oklch(0.72 0.16 265);
+  --sl-color-accent-high: oklch(0.85 0.09 265);
+}
+
+/* light mode */
+:root[data-theme='light'] {
+  --sl-color-white: oklch(0.18 0.016 260);
+  --sl-color-gray-1: oklch(0.24 0.016 260);
+  --sl-color-gray-2: oklch(0.34 0.018 260);
+  --sl-color-gray-3: oklch(0.48 0.018 260);
+  --sl-color-gray-4: oklch(0.64 0.015 260);
+  --sl-color-gray-5: oklch(0.82 0.012 260);
+  --sl-color-gray-6: oklch(0.94 0.006 260);
+  --sl-color-gray-7: oklch(0.975 0.003 260);
+  --sl-color-black: oklch(0.995 0.002 260);
+
+  --sl-color-accent-high: oklch(0.4 0.16 265);
+  --sl-color-accent: oklch(0.5 0.18 265);
+  --sl-color-accent-low: oklch(0.93 0.025 265);
+}
+
+/* ---------------------------------------------------------------------
+   typography - inter for text, a real descending heading scale already
+   comes from starlight's --sl-text-h1..h5 tokens; we just tighten measure
+   and headline tracking on top of it
+   ------------------------------------------------------------------- */
+
+.sl-markdown-content {
+  --sl-line-height: 1.65;
+}
+
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3 {
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.sl-markdown-content p,
+.sl-markdown-content li {
+  text-wrap: pretty;
+}
+
+/* code blocks: shadow for elevation, consistent radius */
+.expressive-code .frame {
+  border-radius: 0.625rem;
+  box-shadow: var(--sl-shadow-md);
+}
+
+/* ---------------------------------------------------------------------
+   ui polish - concentric radius on inline code/cards, restrained motion
+   ------------------------------------------------------------------- */
+
+:not(pre) > code {
+  border-radius: 0.3rem;
+}
+
+.card {
+  border-radius: 0.75rem;
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.card:hover {
+  box-shadow: var(--sl-shadow-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

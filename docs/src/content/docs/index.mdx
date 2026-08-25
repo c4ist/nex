@@ -1,0 +1,80 @@
+---
+title: nex
+description: A lightweight, statically typed, compiled programming language.
+template: splash
+hero:
+  tagline: A lightweight, statically typed, compiled language. C/Go/Rust-flavoured syntax, no build boilerplate.
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/c4ist/nex
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, Aside, Code } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Status: pre-alpha">
+	The lexer works. Nothing runs yet. Implementation progress is tracked in
+	[`progress.txt`](https://github.com/c4ist/nex/blob/main/progress.txt) and the
+	[roadmap](/roadmap/).
+</Aside>
+
+<Code code={`fn main() {\n    print("hello, world");\n}`} lang="rust" title="hello.nex" />
+
+## Design goals
+
+<CardGrid>
+	<Card title="Lightweight" icon="rocket">
+		Small language, small runtime, fast compiles.
+	</Card>
+	<Card title="Statically typed" icon="approve-check">
+		Everything is checked before it runs.
+	</Card>
+	<Card title="Familiar" icon="puzzle">
+		C/Go/Rust-flavoured syntax; no surprises.
+	</Card>
+	<Card title="No ceremony" icon="setting">
+		Local type inference, no header files, no build boilerplate.
+	</Card>
+</CardGrid>
+
+Non-goals for v0.1: ownership/borrow checking, lifetimes, traits with dynamic
+dispatch, async, threads, macros, a central package registry. See
+[Language Design](/language-design/) for the full spec.
+
+## What works today
+
+| Area           | Status                                                        |
+| -------------- | -------------------------------------------------------------- |
+| Lexer          | done — full token stream with error recovery                   |
+| AST foundation | in progress — expressions, statements, items, types all defined |
+| Parser         | not started (Phase 3)                                          |
+| Interpreter    | not started (Phase 5)                                          |
+| Type checker   | not started (Phase 6)                                          |
+| Codegen        | not started (Phases 8–9)                                       |
+| CLI            | `nex lex` works; `build`/`run`/`check`/`fmt`/`test` are stubs   |
+
+The only working subcommand today dumps the token stream:
+
+```sh
+cargo run -p nex-driver -- lex examples/hello.nex
+```
+
+See [Getting Started](/getting-started/) and the
+[lexical structure reference](/reference/lexical-structure/) for details.
+
+## Repository layout
+
+| Path                 | What it is                                    |
+| --------------------- | --------------------------------------------- |
+| `crates/nex-lexer`   | Source text to tokens                         |
+| `crates/nex-syntax`  | AST node plumbing (parser arrives in Phase 3) |
+| `crates/nex-driver`  | The `nex` command line tool                   |
+| `examples/`          | Sample `.nex` programs used by the test suite |
+| `docs/`              | This documentation site                       |
+| `progress.txt`       | Which roadmap step is done, and what is next  |
+
+License: MIT OR Apache-2.0

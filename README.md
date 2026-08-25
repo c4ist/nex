@@ -17,7 +17,8 @@ Nex aims to be a small language with a small runtime: C/Go/Rust-flavoured
 syntax, static types with local inference, structs, enums and pattern matching,
 and no build boilerplate. Programs are interpreted during development and
 compiled to native code through LLVM (and to WebAssembly) for release. See
-[`docs/src/language-design.md`](docs/src/language-design.md) for the spec.
+[`docs/src/content/docs/language-design.md`](docs/src/content/docs/language-design.md)
+for the spec.
 
 ## Repository layout
 
@@ -31,12 +32,19 @@ compiled to native code through LLVM (and to WebAssembly) for release. See
 
 ## Documentation
 
-The documentation site lives in [`docs/`](docs/src/index.md) (an mdBook
-project; `mdbook serve docs` to view it locally). It covers the [language
-spec](docs/src/language-design.md), the [lexical structure
-reference](docs/src/reference/lexical-structure.md), the [compiler
-architecture](docs/src/internals/architecture.md) and the
-[roadmap](docs/src/roadmap.md).
+The documentation site lives in [`docs/`](docs/src/content/docs/index.mdx) (an
+[Astro Starlight](https://starlight.astro.build) project):
+
+```sh
+cd docs
+npm install
+npm run dev
+```
+
+It covers the [language spec](docs/src/content/docs/language-design.md), the
+[lexical structure reference](docs/src/content/docs/reference/lexical-structure.md),
+the [compiler architecture](docs/src/content/docs/internals/architecture.md)
+and the [roadmap](docs/src/content/docs/roadmap.md).
 
 ## Building
 

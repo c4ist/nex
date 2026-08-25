@@ -1,4 +1,7 @@
-# Nex language design (spec v0.0)
+---
+title: Language Design
+description: The normative spec nex's implementation is written against (spec v0.0).
+---
 
 This is the normative sketch the implementation is written against. It will be
 frozen as v0.1 at the end of Phase 7.
@@ -17,7 +20,7 @@ threads, macros, a central package registry.
 
 ## Sample
 
-```nex
+```rust
 // comments are // only (block comments arrive in Phase 7)
 fn add(a: i32, b: i32) -> i32 { return a + b; }
 

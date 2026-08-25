@@ -1,9 +1,12 @@
-# Roadmap
+---
+title: Roadmap
+description: Sixteen phases from lexer to a tagged v0.1.0 release.
+---
 
 Sixteen phases from lexer to a tagged `v0.1.0` release with a package manager,
 language server, standard library and documentation site. Progress is tracked
-one micro-step at a time in [`progress.txt`](../../progress.txt) — one micro-step
-per commit, no skipping ahead.
+one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/main/progress.txt)
+— one micro-step per commit, no skipping ahead.
 
 ## Current position
 
@@ -15,7 +18,7 @@ per commit, no skipping ahead.
 ## Phase status
 
 | Phase | Milestone                          | State       |
-| ----- | ---------------------------------- | ----------- |
+| ----- | ------------------------------------ | ----------- |
 | 0     | Foundations                        | done        |
 | 1     | Lexer                              | done        |
 | 2     | AST design                         | in progress |
@@ -37,7 +40,7 @@ per commit, no skipping ahead.
 
 - **0 — Foundations:** workspace, CI, examples, progress tracking.
 - **1 — Lexer:** full token stream with error recovery (done; see the
-  [lexical structure reference](reference/lexical-structure.md)).
+  [lexical structure reference](/reference/lexical-structure/)).
 - **2 — AST design:** node identity (`NodeId`), spans, and the expression,
   statement, item, and type node types (done). Patterns follow.
 - **3–4 — Parser:** expressions first, then statements and items, with error
