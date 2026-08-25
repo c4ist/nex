@@ -7,7 +7,6 @@
 *.exe
 *.wasm
 *.ll
-/docs/book
 node_modules/
 .DS_Store
 *.pending-snap
