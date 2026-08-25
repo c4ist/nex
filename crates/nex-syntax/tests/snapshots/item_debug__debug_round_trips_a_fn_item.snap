@@ -16,9 +16,10 @@ Item {
                     name: "a"@7..8,
                     ty: Type {
                         info: #0@10..13,
-                        kind: Named(
-                            "i32"@10..13,
-                        ),
+                        kind: Named {
+                            name: "i32"@10..13,
+                            args: [],
+                        },
                     },
                 },
                 Param {
@@ -26,18 +27,20 @@ Item {
                     name: "b"@15..16,
                     ty: Type {
                         info: #2@18..21,
-                        kind: Named(
-                            "i32"@18..21,
-                        ),
+                        kind: Named {
+                            name: "i32"@18..21,
+                            args: [],
+                        },
                     },
                 },
             ],
             return_type: Some(
                 Type {
                     info: #7@26..29,
-                    kind: Named(
-                        "i32"@26..29,
-                    ),
+                    kind: Named {
+                        name: "i32"@26..29,
+                        args: [],
+                    },
                 },
             ),
             body: Block {

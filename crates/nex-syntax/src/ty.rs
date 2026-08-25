@@ -1,4 +1,4 @@
-//! type ast. just named types for now; the rest lands in step 2.5.
+//! type ast.
 
 use crate::node::{AstNode, HasSpan, Ident, NodeId, NodeInfo};
 use nex_lexer::Span;
@@ -29,5 +29,16 @@ impl AstNode for Type {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeKind {
-    Named(Ident),
+    /// `i32`, `Point`, `Option<T>`, `Vec<i32>` - `args` is empty for a
+    /// non-generic name
+    Named { name: Ident, args: Vec<Type> },
+    /// `[T]`
+    Array(Box<Type>),
+    /// `&T`
+    Ref(Box<Type>),
+    /// `fn(A, B) -> C`; a bare `fn(A, B)` has `return_type: None`
+    Fn {
+        params: Vec<Type>,
+        return_type: Option<Box<Type>>,
+    },
 }

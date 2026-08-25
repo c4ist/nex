@@ -14,7 +14,13 @@ fn ident(name: &str, span: Span) -> nex_syntax::Ident {
 }
 
 fn named_type(ids: &mut NodeIdGen, name: &str, span: Span) -> Type {
-    Type::new(TypeKind::Named(ident(name, span)), info(ids, span))
+    Type::new(
+        TypeKind::Named {
+            name: ident(name, span),
+            args: vec![],
+        },
+        info(ids, span),
+    )
 }
 
 // `fn add(a: i32, b: i32) -> i32 { return a + b; }`

@@ -19,9 +19,10 @@ Item {
                     fields: [
                         Type {
                             info: #0@23..24,
-                            kind: Named(
-                                "T"@23..24,
-                            ),
+                            kind: Named {
+                                name: "T"@23..24,
+                                args: [],
+                            },
                         },
                     ],
                 },

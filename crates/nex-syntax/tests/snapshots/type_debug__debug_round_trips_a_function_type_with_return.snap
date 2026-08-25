@@ -1,0 +1,35 @@
+---
+source: crates/nex-syntax/tests/type_debug.rs
+expression: ty
+snapshot_kind: text
+---
+Type {
+    info: #3@0..19,
+    kind: Fn {
+        params: [
+            Type {
+                info: #0@3..6,
+                kind: Named {
+                    name: "i32"@3..6,
+                    args: [],
+                },
+            },
+            Type {
+                info: #1@8..11,
+                kind: Named {
+                    name: "i32"@8..11,
+                    args: [],
+                },
+            },
+        ],
+        return_type: Some(
+            Type {
+                info: #2@16..19,
+                kind: Named {
+                    name: "i32"@16..19,
+                    args: [],
+                },
+            },
+        ),
+    },
+}
