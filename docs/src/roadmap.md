@@ -7,10 +7,10 @@ per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 2.3
+- **last step:** 2.4
 - **current phase:** 2 (AST design) — in progress
-- **next step:** 2.4 — item AST (fn with params/return type/generics, struct,
-  enum, use/mod, impl stub)
+- **next step:** 2.5 — type AST (named, generic args, array, reference `&T`,
+  function type)
 
 ## Phase status
 
@@ -38,8 +38,8 @@ per commit, no skipping ahead.
 - **0 — Foundations:** workspace, CI, examples, progress tracking.
 - **1 — Lexer:** full token stream with error recovery (done; see the
   [lexical structure reference](reference/lexical-structure.md)).
-- **2 — AST design:** node identity (`NodeId`), spans, and the expression and
-  statement node types (done). Items, types, and patterns follow.
+- **2 — AST design:** node identity (`NodeId`), spans, and the expression,
+  statement, and item node types (done). Types and patterns follow.
 - **3–4 — Parser:** expressions first, then statements and items, with error
   recovery and `ariadne` diagnostics (step 3.11).
 - **5 — Tree-walking interpreter:** `nex run`.

@@ -1,0 +1,37 @@
+---
+source: crates/nex-syntax/tests/item_debug.rs
+expression: item
+snapshot_kind: text
+---
+Item {
+    info: #5@0..31,
+    kind: Struct(
+        Struct {
+            info: #4@13..31,
+            name: "Point"@7..12,
+            generics: [],
+            fields: [
+                FieldDef {
+                    info: #1@15..21,
+                    name: "x"@15..16,
+                    ty: Type {
+                        info: #0@18..21,
+                        kind: Named(
+                            "f64"@18..21,
+                        ),
+                    },
+                },
+                FieldDef {
+                    info: #3@23..29,
+                    name: "y"@23..24,
+                    ty: Type {
+                        info: #2@26..29,
+                        kind: Named(
+                            "f64"@26..29,
+                        ),
+                    },
+                },
+            ],
+        },
+    ),
+}

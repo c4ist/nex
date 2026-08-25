@@ -1,0 +1,36 @@
+---
+source: crates/nex-syntax/tests/item_debug.rs
+expression: item
+snapshot_kind: text
+---
+Item {
+    info: #4@0..33,
+    kind: Enum(
+        Enum {
+            info: #3@16..33,
+            name: "Option"@5..11,
+            generics: [
+                "T"@12..13,
+            ],
+            variants: [
+                Variant {
+                    info: #1@18..25,
+                    name: "Some"@18..22,
+                    fields: [
+                        Type {
+                            info: #0@23..24,
+                            kind: Named(
+                                "T"@23..24,
+                            ),
+                        },
+                    ],
+                },
+                Variant {
+                    info: #2@27..31,
+                    name: "None"@27..31,
+                    fields: [],
+                },
+            ],
+        },
+    ),
+}

@@ -1,0 +1,63 @@
+---
+source: crates/nex-syntax/tests/item_debug.rs
+expression: item
+snapshot_kind: text
+---
+Item {
+    info: #9@0..37,
+    kind: Fn(
+        Fn {
+            info: #8@22..37,
+            name: "add"@3..6,
+            generics: [],
+            params: [
+                Param {
+                    info: #1@7..13,
+                    name: "a"@7..8,
+                    ty: Type {
+                        info: #0@10..13,
+                        kind: Named(
+                            "i32"@10..13,
+                        ),
+                    },
+                },
+                Param {
+                    info: #3@15..21,
+                    name: "b"@15..16,
+                    ty: Type {
+                        info: #2@18..21,
+                        kind: Named(
+                            "i32"@18..21,
+                        ),
+                    },
+                },
+            ],
+            return_type: Some(
+                Type {
+                    info: #7@26..29,
+                    kind: Named(
+                        "i32"@26..29,
+                    ),
+                },
+            ),
+            body: Block {
+                info: #6@24..37,
+                stmts: [
+                    Stmt {
+                        info: #5@26..35,
+                        kind: Return(
+                            Some(
+                                Expr {
+                                    info: #4@33..34,
+                                    kind: Ident(
+                                        "a"@33..34,
+                                    ),
+                                },
+                            ),
+                        ),
+                    },
+                ],
+            },
+        },
+    ),
+}
