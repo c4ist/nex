@@ -10,10 +10,9 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 2.8
-- **current phase:** 3 (Parser: expressions) — starting
-- **next step:** 3.1 — parser scaffolding: `Parser` struct over `Vec<Token>`,
-  `peek`/`advance`/`expect`, `ParseError` with spans
+- **last step:** 3.1
+- **current phase:** 3 (Parser: expressions) — in progress
+- **next step:** 3.2 — literal and identifier expressions
 
 ## Phase status
 
@@ -22,7 +21,7 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 | 0     | Foundations                        | done        |
 | 1     | Lexer                              | done        |
 | 2     | AST design                         | done        |
-| 3     | Parser: expressions                | planned     |
+| 3     | Parser: expressions                | in progress |
 | 4     | Parser: statements & items         | planned     |
 | 5     | Tree-walking interpreter           | planned     |
 | 6     | Name resolution + type checker     | planned     |

@@ -5,8 +5,8 @@ description: Workspace layout and the design decisions already locked in.
 
 :::note[Status: foundations in place]
 This page describes the workspace layout and the design decisions that
-are already locked in. The parser and all later passes are planned but
-not yet written.
+are already locked in. Parsing has started (scaffolding only, step 3.1);
+name resolution, type checking, and codegen are planned but not yet written.
 :::
 
 ## Workspace layout
@@ -29,7 +29,7 @@ source text
    │  nex-lexer          (Phase 1 — done)
    ▼
 tokens
-   │  nex-syntax parser  (Phases 3–4 — planned)
+   │  nex-syntax parser  (Phases 3–4 — scaffolding done, 3.1)
    ▼
 AST (immutable)
    │  name resolution + type checker  (Phase 6 — planned)
@@ -74,7 +74,24 @@ results all live in side tables keyed by `NodeId`, never in the tree itself.
 The AST now covers expressions, statements, items (fn/struct/enum/use/mod/impl
 stub), types (named/generic/array/reference/fn), and patterns
 (wildcard/binding/literal/enum-variant/struct/tuple) — the full node set
-phase 2 set out to define.
+phase 2 set out to define. `Module` is the root: one parsed file's `Vec<Item>`
+plus its own `NodeInfo`.
+
+The [AST coverage review](/internals/ast-coverage/) tracks real gaps found
+against the spec — notably, expressions can't yet hold a `::`-qualified path
+(`Option::Some`), so the spec's own sample match statement can't be built as
+an `Expr` today.
+
+## The parser (`nex-syntax`, step 3.1)
+
+`Parser` wraps a `&[Token]` cursor with `peek`/`advance`/`expect` and
+collects recoverable `ParseError`s instead of aborting on the first mistake.
+`advance()` is a no-op once the cursor reaches `Eof`, so callers can't walk
+off the end of the token stream. `parse_module()` is the entry point; item
+parsing itself starts in Phase 4, so for now it just reports one "item
+parsing arrives in Phase 4" error per leftover token and consumes it — an
+empty file parses to an empty `Module` cleanly, anything else terminates
+without a real result yet.
 
 ## The CLI (`nex-driver`)
 
