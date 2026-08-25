@@ -1,0 +1,58 @@
+---
+source: crates/nex-syntax/tests/stmt_debug.rs
+expression: stmt
+snapshot_kind: text
+---
+Stmt {
+    info: #8@0..29,
+    kind: ForIn {
+        binding: "i"@4..5,
+        iter: Expr {
+            info: #5@9..14,
+            kind: Range {
+                start: Expr {
+                    info: #3@9..10,
+                    kind: Int(
+                        0,
+                    ),
+                },
+                end: Expr {
+                    info: #4@12..14,
+                    kind: Int(
+                        10,
+                    ),
+                },
+                inclusive: false,
+            },
+        },
+        body: Block {
+            info: #7@15..29,
+            stmts: [
+                Stmt {
+                    info: #6@18..27,
+                    kind: Expr(
+                        Expr {
+                            info: #2@18..26,
+                            kind: Call {
+                                callee: Expr {
+                                    info: #0@18..23,
+                                    kind: Ident(
+                                        "print"@18..23,
+                                    ),
+                                },
+                                args: [
+                                    Expr {
+                                        info: #1@24..25,
+                                        kind: Ident(
+                                            "i"@24..25,
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ],
+        },
+    },
+}

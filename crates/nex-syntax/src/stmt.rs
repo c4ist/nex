@@ -1,7 +1,7 @@
-//! statement ast. just what blocks need for now; the rest lands in step 2.3.
+//! statement ast.
 
-use crate::expr::Expr;
-use crate::node::{AstNode, HasSpan, NodeId, NodeInfo};
+use crate::expr::{Block, Expr};
+use crate::node::{AstNode, HasSpan, Ident, NodeId, NodeInfo};
 use nex_lexer::Span;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -31,4 +31,21 @@ impl AstNode for Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtKind {
     Expr(Expr),
+    Let {
+        mutable: bool,
+        name: Ident,
+        value: Expr,
+    },
+    Return(Option<Expr>),
+    While {
+        cond: Expr,
+        body: Block,
+    },
+    ForIn {
+        binding: Ident,
+        iter: Expr,
+        body: Block,
+    },
+    Break,
+    Continue,
 }
