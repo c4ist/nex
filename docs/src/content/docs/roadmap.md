@@ -10,9 +10,9 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 3.7
+- **last step:** 3.8
 - **current phase:** 3 (Parser: expressions) — in progress
-- **next step:** 3.8 — `match` expressions
+- **next step:** 3.9 — range expressions `a..b`, `a..=b`
 
 ## Phase status
 

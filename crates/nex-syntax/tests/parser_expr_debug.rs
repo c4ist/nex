@@ -406,3 +406,100 @@ fn an_if_missing_its_body_reports_an_error() {
     let (_, errors) = parse("if a");
     assert_eq!(errors, vec!["expected `{`, found end of file"]);
 }
+
+// ---------------------------------------------------------------------
+// step 3.8: match expressions with all phase-2.6 patterns
+// ---------------------------------------------------------------------
+
+#[test]
+fn parses_a_match_with_wildcard_and_binding_patterns() {
+    assert_eq!(sexp("match x { _ => a }"), "(match x (_ a))");
+    assert_eq!(sexp("match x { v => v }"), "(match x (v v))");
+}
+
+#[test]
+fn parses_literal_patterns() {
+    assert_eq!(
+        sexp("match x { 1 => a, 2.5 => b, \"s\" => c, true => d }"),
+        "(match x (1 a) (2.5 b) (\"s\" c) (true d))"
+    );
+}
+
+// the minus belongs to the literal - a pattern has nothing to negate
+#[test]
+fn parses_negative_number_patterns() {
+    assert_eq!(sexp("match x { -1 => a }"), "(match x (-1 a))");
+    assert_eq!(sexp("match x { -2.5 => a }"), "(match x (-2.5 a))");
+}
+
+#[test]
+fn parses_enum_variant_patterns() {
+    assert_eq!(
+        sexp("match x { Option::Some(v) => v, Option::None => z }"),
+        "(match x ((Option::Some v) v) (Option::None z))"
+    );
+    // a single-segment name with a payload is still a variant
+    assert_eq!(sexp("match x { Some(v) => v }"), "(match x ((Some v) v))");
+}
+
+#[test]
+fn parses_struct_patterns() {
+    assert_eq!(
+        sexp("match p { Point { x: px, y: py } => px }"),
+        "(match p ((struct-pat Point (x px) (y py)) px))"
+    );
+}
+
+#[test]
+fn parses_tuple_patterns() {
+    assert_eq!(sexp("match t { (a, b) => a }"), "(match t ((tuple a b) a))");
+}
+
+#[test]
+fn parses_nested_patterns() {
+    assert_eq!(
+        sexp("match x { Some((a, Point { x: 1 })) => a }"),
+        "(match x ((Some (tuple a (struct-pat Point (x 1)))) a))"
+    );
+}
+
+#[test]
+fn match_arms_allow_a_trailing_comma() {
+    assert_eq!(sexp("match x { _ => a, }"), "(match x (_ a))");
+}
+
+// `::` paths work in *patterns* but not yet in expressions, so the arms of
+// the spec's sample match parse while its scrutinee does not. see
+// docs/.../internals/ast-coverage.md - ExprKind has no path variant.
+#[test]
+fn match_arms_accept_the_spec_sample_patterns() {
+    assert_eq!(
+        sexp("match x { Option::Some(v) => print(v), Option::None => print(\"none\") }"),
+        "(match x ((Option::Some v) (call print v)) (Option::None (call print \"none\")))"
+    );
+}
+
+// known gap: a `::`-qualified *expression* has no ExprKind to parse into,
+// so the spec's `match Option::Some(x) { .. }` scrutinee is rejected.
+#[test]
+fn a_path_qualified_scrutinee_is_not_supported_yet() {
+    let (_, errors) = parse("match Option::Some(x) { _ => a }");
+    assert_eq!(errors, vec!["expected `{`, found `::`"]);
+}
+
+#[test]
+fn a_match_scrutinee_is_not_a_struct_literal() {
+    assert_eq!(sexp("match x { _ => a }"), "(match x (_ a))");
+}
+
+#[test]
+fn a_match_arm_missing_its_arrow_reports_an_error() {
+    let (_, errors) = parse("match x { _ a }");
+    assert_eq!(errors, vec!["expected `=>`, found identifier"]);
+}
+
+#[test]
+fn an_unclosed_match_reports_an_error_without_hanging() {
+    let (_, errors) = parse("match x { _ => a");
+    assert_eq!(errors, vec!["expected `}`, found end of file"]);
+}

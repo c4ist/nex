@@ -4,9 +4,10 @@
 //! records a "not implemented yet" error and moves on, the same way
 //! `nex-driver`'s unfinished subcommands do.
 
-use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, UnaryOp};
+use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
 use crate::module::Module;
 use crate::node::{NodeIdGen, NodeInfo, Spanned};
+use crate::pattern::{FieldPattern, Pattern, PatternKind};
 use crate::stmt::{Stmt, StmtKind};
 use nex_lexer::{Span, Token, TokenKind};
 
@@ -319,6 +320,7 @@ impl<'a> Parser<'a> {
                 return self.leaf(ExprKind::Block(block), span);
             }
             TokenKind::If => return self.parse_if(),
+            TokenKind::Match => return self.parse_match(),
             TokenKind::Ident(_)
                 if !self.no_struct_literal && self.peek_nth(1).kind == TokenKind::LBrace =>
             {
@@ -407,6 +409,236 @@ impl<'a> Parser<'a> {
             },
             span,
         )
+    }
+
+    /// `match scrutinee { pat => expr, pat => expr }`.
+    fn parse_match(&mut self) -> Expr {
+        let match_tok = self.expect(TokenKind::Match);
+        // same ambiguity as an `if` condition: `match x { .. }`
+        let scrutinee = self.without_struct_literals(|p| p.parse_expr());
+
+        let open = self.expect(TokenKind::LBrace);
+        if open.kind != TokenKind::LBrace {
+            let span = match_tok.span.merge(open.span);
+            return Expr::new(
+                ExprKind::Match {
+                    scrutinee: Box::new(scrutinee),
+                    arms: Vec::new(),
+                },
+                NodeInfo::dummy(span),
+            );
+        }
+
+        let mut arms = Vec::new();
+        loop {
+            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
+                break;
+            }
+
+            let pattern = self.parse_pattern();
+            self.expect(TokenKind::FatArrow);
+            let body = self.with_struct_literals(|p| p.parse_expr());
+            let span = pattern.info.span.merge(body.info.span);
+            arms.push(MatchArm::new(
+                pattern,
+                body,
+                NodeInfo::new(self.ids.fresh(), span),
+            ));
+
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        let close = self.expect(TokenKind::RBrace);
+        let span = match_tok.span.merge(close.span);
+        self.leaf(
+            ExprKind::Match {
+                scrutinee: Box::new(scrutinee),
+                arms,
+            },
+            span,
+        )
+    }
+
+    /// a match pattern: `_`, a binding, a literal, `Enum::Variant(..)`,
+    /// `Struct { .. }`, or a tuple.
+    fn parse_pattern(&mut self) -> Pattern {
+        let tok = self.peek().clone();
+        match tok.kind {
+            TokenKind::Int(v) => {
+                self.advance();
+                self.pattern(PatternKind::Int(v), tok.span)
+            }
+            TokenKind::Float(v) => {
+                self.advance();
+                self.pattern(PatternKind::Float(v), tok.span)
+            }
+            TokenKind::Str(ref s) => {
+                let s = s.clone();
+                self.advance();
+                self.pattern(PatternKind::Str(s), tok.span)
+            }
+            TokenKind::True => {
+                self.advance();
+                self.pattern(PatternKind::Bool(true), tok.span)
+            }
+            TokenKind::False => {
+                self.advance();
+                self.pattern(PatternKind::Bool(false), tok.span)
+            }
+            // negative number literals: `-1 => ..`. the minus is part of
+            // the literal here, not a unary operator - patterns aren't
+            // expressions and there is nothing to negate at runtime.
+            TokenKind::Minus => {
+                self.advance();
+                let lit = self.peek().clone();
+                match lit.kind {
+                    TokenKind::Int(v) => {
+                        self.advance();
+                        self.pattern(PatternKind::Int(-v), tok.span.merge(lit.span))
+                    }
+                    TokenKind::Float(v) => {
+                        self.advance();
+                        self.pattern(PatternKind::Float(-v), tok.span.merge(lit.span))
+                    }
+                    _ => {
+                        self.errors.push(ParseError::new(
+                            format!(
+                                "expected a number after `-` in a pattern, found {}",
+                                lit.kind.describe()
+                            ),
+                            lit.span,
+                        ));
+                        Pattern::new(PatternKind::Wildcard, NodeInfo::dummy(tok.span))
+                    }
+                }
+            }
+            TokenKind::LParen => self.parse_tuple_pattern(),
+            TokenKind::Ident(_) => self.parse_ident_pattern(),
+            _ => {
+                self.advance();
+                self.errors.push(ParseError::new(
+                    format!("expected a pattern, found {}", tok.kind.describe()),
+                    tok.span,
+                ));
+                Pattern::new(PatternKind::Wildcard, NodeInfo::dummy(tok.span))
+            }
+        }
+    }
+
+    /// `(a, b)` - a tuple pattern. a trailing comma is allowed.
+    fn parse_tuple_pattern(&mut self) -> Pattern {
+        let open = self.expect(TokenKind::LParen);
+        let mut elems = Vec::new();
+        loop {
+            if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
+                break;
+            }
+            elems.push(self.parse_pattern());
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        let close = self.expect(TokenKind::RParen);
+        self.pattern(PatternKind::Tuple(elems), open.span.merge(close.span))
+    }
+
+    /// an identifier-led pattern: `_`, a binding, `Enum::Variant(..)`, or
+    /// `Struct { .. }`. which one it is depends on what follows the name.
+    fn parse_ident_pattern(&mut self) -> Pattern {
+        let first = self.expect_ident();
+
+        // `_` lexes as an ordinary identifier, so the wildcard is spelled
+        // rather than tokenised
+        if first.value == "_" {
+            return self.pattern(PatternKind::Wildcard, first.span);
+        }
+
+        // `Enum::Variant` - collect the whole `::` path first
+        let mut path = vec![first];
+        while self.peek().kind == TokenKind::ColonColon {
+            self.advance();
+            path.push(self.expect_ident());
+        }
+
+        match self.peek().kind {
+            // `Variant(a, b)` - payload patterns
+            TokenKind::LParen => {
+                self.advance();
+                let mut fields = Vec::new();
+                loop {
+                    if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
+                        break;
+                    }
+                    fields.push(self.parse_pattern());
+                    if self.peek().kind == TokenKind::Comma {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                let close = self.expect(TokenKind::RParen);
+                let span = path[0].span.merge(close.span);
+                self.pattern(PatternKind::EnumVariant { path, fields }, span)
+            }
+            // `Point { x: px }` - struct pattern. only single-segment
+            // names take this form today, matching the struct literal
+            // syntax on the expression side.
+            TokenKind::LBrace if path.len() == 1 => {
+                self.advance();
+                let mut fields = Vec::new();
+                loop {
+                    if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
+                        break;
+                    }
+                    let name = self.expect_ident();
+                    self.expect(TokenKind::Colon);
+                    let pat = self.parse_pattern();
+                    let span = name.span.merge(pat.info.span);
+                    fields.push(FieldPattern::new(
+                        name,
+                        pat,
+                        NodeInfo::new(self.ids.fresh(), span),
+                    ));
+                    if self.peek().kind == TokenKind::Comma {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                let close = self.expect(TokenKind::RBrace);
+                let name = path.remove(0);
+                let span = name.span.merge(close.span);
+                self.pattern(PatternKind::Struct { name, fields }, span)
+            }
+            // a multi-segment path with no payload is a unit variant
+            // (`Option::None`); a bare name binds
+            _ => {
+                if path.len() == 1 {
+                    let name = path.remove(0);
+                    let span = name.span;
+                    self.pattern(PatternKind::Binding(name), span)
+                } else {
+                    let span = path[0].span.merge(path[path.len() - 1].span);
+                    self.pattern(
+                        PatternKind::EnumVariant {
+                            path,
+                            fields: Vec::new(),
+                        },
+                        span,
+                    )
+                }
+            }
+        }
+    }
+
+    fn pattern(&mut self, kind: PatternKind, span: Span) -> Pattern {
+        Pattern::new(kind, NodeInfo::new(self.ids.fresh(), span))
     }
 
     /// `Point { x: 1.0, y: 2.0 }`. only reached when struct literals are
