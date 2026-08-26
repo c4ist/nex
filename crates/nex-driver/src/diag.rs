@@ -25,11 +25,15 @@ pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
         let _ = writeln!(out, "{pad} |");
         let _ = writeln!(out, "{line_no} | {line_text}");
 
+        // both offsets are byte offsets into line_text; the caret row is
+        // measured in display columns, so convert through display_width
+        // rather than counting bytes (a multi-byte char is one column here,
+        // not one column per byte)
         let start_col = diagnostic.span.start as usize - line_start;
-        let end_on_line = (diagnostic.span.end as usize).min(line_start + line_text.len());
-        let width = end_on_line
-            .saturating_sub(diagnostic.span.start as usize)
-            .max(1);
+        let end_col = ((diagnostic.span.end as usize).min(line_start + line_text.len()))
+            .saturating_sub(line_start)
+            .max(start_col);
+        let width = display_width(&line_text[start_col..end_col]).max(1);
         let _ = writeln!(
             out,
             "{pad} | {}{}",
@@ -89,5 +93,52 @@ mod tests {
         assert!(output.contains("1 | let x = @;"), "{output}");
         assert!(output.contains("        ^"), "{output}");
         assert!(output.contains("help: remove it"), "{output}");
+    }
+
+    // the caret row is measured in display columns, so a multi-byte char
+    // gets one caret, not one per byte
+    #[test]
+    fn carets_count_characters_not_bytes() {
+        let src = "let emoji = 😀\n";
+        let span = Span::from_usize(12, 12 + '😀'.len_utf8());
+        let diagnostics = vec![Diagnostic {
+            message: "unexpected character `😀`".into(),
+            span,
+            help: None,
+        }];
+        let output = render("test.nex", src, &diagnostics);
+        let caret_line = output
+            .lines()
+            .find(|line| line.contains('^'))
+            .expect("a caret row");
+        assert_eq!(caret_line.matches('^').count(), 1, "{output}");
+    }
+
+    // the leading pad is also display columns, so the caret lands under the
+    // offending text even when earlier chars on the line are multi-byte
+    #[test]
+    fn caret_lines_up_after_multibyte_characters() {
+        let src = "let café = @\n";
+        let at = src.find('@').expect("an @ in the fixture");
+        let diagnostics = vec![Diagnostic {
+            message: "unexpected character `@`".into(),
+            span: Span::from_usize(at, at + 1),
+            help: None,
+        }];
+        let output = render("test.nex", src, &diagnostics);
+        let caret_line = output
+            .lines()
+            .find(|line| line.contains('^'))
+            .expect("a caret row");
+        let source_line = output
+            .lines()
+            .find(|line| line.contains("let café"))
+            .expect("the source row");
+
+        // both rows share the `N | ` gutter, so the caret's column in the
+        // caret row must equal the `@`'s column in the source row
+        let caret_col = caret_line.chars().position(|c| c == '^').unwrap();
+        let at_col = source_line.chars().position(|c| c == '@').unwrap();
+        assert_eq!(caret_col, at_col, "{output}");
     }
 }
