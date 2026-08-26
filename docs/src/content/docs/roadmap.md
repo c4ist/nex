@@ -10,9 +10,9 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 3.4
+- **last step:** 3.5
 - **current phase:** 3 (Parser: expressions) — in progress
-- **next step:** 3.5 — call, field-access and index postfix chains
+- **next step:** 3.6 — struct literals
 
 ## Phase status
 

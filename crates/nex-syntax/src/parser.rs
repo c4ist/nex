@@ -179,7 +179,96 @@ impl<'a> Parser<'a> {
                 span,
             );
         }
-        self.parse_leaf()
+        self.parse_postfix()
+    }
+
+    /// a leaf followed by any number of postfix chains: `f(x)(y).z[0]`.
+    /// these bind tighter than the prefix operators, so `-a.b()` negates
+    /// the *result* of the call.
+    fn parse_postfix(&mut self) -> Expr {
+        let mut expr = self.parse_leaf();
+
+        loop {
+            expr = match self.peek().kind {
+                TokenKind::LParen => {
+                    self.advance();
+                    let args = self.parse_call_args();
+                    let close = self.expect(TokenKind::RParen);
+                    let span = expr.info.span.merge(close.span);
+                    self.leaf(
+                        ExprKind::Call {
+                            callee: Box::new(expr),
+                            args,
+                        },
+                        span,
+                    )
+                }
+                TokenKind::Dot => {
+                    self.advance();
+                    let name = self.expect_ident();
+                    let span = expr.info.span.merge(name.span);
+                    self.leaf(
+                        ExprKind::Field {
+                            base: Box::new(expr),
+                            field: name,
+                        },
+                        span,
+                    )
+                }
+                TokenKind::LBracket => {
+                    self.advance();
+                    let index = self.parse_expr();
+                    let close = self.expect(TokenKind::RBracket);
+                    let span = expr.info.span.merge(close.span);
+                    self.leaf(
+                        ExprKind::Index {
+                            base: Box::new(expr),
+                            index: Box::new(index),
+                        },
+                        span,
+                    )
+                }
+                _ => break,
+            };
+        }
+
+        expr
+    }
+
+    /// a comma-separated argument list, already past the `(` and stopping
+    /// before the `)`. a trailing comma is allowed.
+    fn parse_call_args(&mut self) -> Vec<Expr> {
+        let mut args = Vec::new();
+        loop {
+            // `)` ends the list; Eof would otherwise spin, since neither
+            // `parse_expr` nor `expect` consumes anything there
+            if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
+                break;
+            }
+            args.push(self.parse_expr());
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        args
+    }
+
+    /// consumes an identifier, or reports one and yields a placeholder so
+    /// the caller can keep parsing.
+    fn expect_ident(&mut self) -> Spanned<String> {
+        let tok = self.peek().clone();
+        if let TokenKind::Ident(name) = tok.kind {
+            self.advance();
+            Spanned::new(name, tok.span)
+        } else {
+            self.errors.push(ParseError::new(
+                format!("expected identifier, found {}", tok.kind.describe()),
+                tok.span,
+            ));
+            Spanned::new(String::new(), tok.span)
+        }
     }
 
     /// a literal, an identifier, a parenthesized expression, or a block.

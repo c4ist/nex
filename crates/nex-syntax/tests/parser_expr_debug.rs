@@ -216,3 +216,73 @@ fn an_unclosed_empty_block_reports_an_error_without_hanging() {
     assert_eq!(printed, "(block)");
     assert_eq!(errors, vec!["expected `}`, found end of file"]);
 }
+
+// ---------------------------------------------------------------------
+// step 3.5: call, field-access and index postfix chains
+// ---------------------------------------------------------------------
+
+#[test]
+fn parses_calls_with_various_arities() {
+    assert_eq!(sexp("f()"), "(call f)");
+    assert_eq!(sexp("f(a)"), "(call f a)");
+    assert_eq!(sexp("f(a, b)"), "(call f a b)");
+    // a trailing comma is allowed
+    assert_eq!(sexp("f(a, b,)"), "(call f a b)");
+}
+
+#[test]
+fn parses_field_access_and_indexing() {
+    assert_eq!(sexp("a.b"), "(field a b)");
+    assert_eq!(sexp("a.b.c"), "(field (field a b) c)");
+    assert_eq!(sexp("a[0]"), "(index a 0)");
+    assert_eq!(sexp("a[0][1]"), "(index (index a 0) 1)");
+}
+
+// the plan's worked example for this step
+#[test]
+fn parses_a_mixed_postfix_chain() {
+    assert_eq!(
+        sexp("f(x)(y).z[0]"),
+        "(index (field (call (call f x) y) z) 0)"
+    );
+}
+
+// postfix binds tighter than prefix, so the negation applies to the call's
+// result rather than to `a`
+#[test]
+fn postfix_binds_tighter_than_prefix() {
+    assert_eq!(sexp("-a.b()"), "(- (call (field a b)))");
+    assert_eq!(sexp("!f(a)"), "(! (call f a))");
+}
+
+#[test]
+fn postfix_binds_tighter_than_any_infix() {
+    assert_eq!(sexp("a + f(b)"), "(+ a (call f b))");
+    assert_eq!(sexp("a.b * c.d"), "(* (field a b) (field c d))");
+}
+
+#[test]
+fn call_arguments_are_full_expressions() {
+    assert_eq!(sexp("f(a + b, c.d)"), "(call f (+ a b) (field c d))");
+    assert_eq!(sexp("f(g(a))"), "(call f (call g a))");
+}
+
+#[test]
+fn a_non_identifier_after_dot_reports_an_error() {
+    let (_, errors) = parse("a.0");
+    assert_eq!(errors, vec!["expected identifier, found integer literal"]);
+}
+
+#[test]
+fn unclosed_postfix_brackets_report_errors_without_hanging() {
+    let (_, errors) = parse("f(a");
+    assert_eq!(errors, vec!["expected `)`, found end of file"]);
+
+    let (_, errors) = parse("a[0");
+    assert_eq!(errors, vec!["expected `]`, found end of file"]);
+
+    // an unterminated argument list must not spin: at Eof neither
+    // parse_expr nor expect consumes anything
+    let (_, errors) = parse("f(a,");
+    assert_eq!(errors, vec!["expected `)`, found end of file"]);
+}
