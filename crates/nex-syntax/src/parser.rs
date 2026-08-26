@@ -4,7 +4,7 @@
 //! records a "not implemented yet" error and moves on, the same way
 //! `nex-driver`'s unfinished subcommands do.
 
-use crate::expr::{BinaryOp, Block, Expr, ExprKind, UnaryOp};
+use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, UnaryOp};
 use crate::module::Module;
 use crate::node::{NodeIdGen, NodeInfo, Spanned};
 use crate::stmt::{Stmt, StmtKind};
@@ -76,6 +76,15 @@ pub struct Parser<'a> {
     pos: usize,
     ids: NodeIdGen,
     errors: Vec<ParseError>,
+    /// set while parsing the condition of an `if`/`while`/`for`, where a
+    /// bare `Ident {` must read as "condition, then the body's opening
+    /// brace" rather than as a struct literal. `if x { }` would otherwise
+    /// parse `x { }` as a struct literal and then find no body.
+    ///
+    /// nothing sets this until `if` arrives in step 3.7; the flag and the
+    /// `with_struct_literals` escape hatch land here because struct
+    /// literals are what create the ambiguity in the first place.
+    no_struct_literal: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -85,16 +94,33 @@ impl<'a> Parser<'a> {
             pos: 0,
             ids: NodeIdGen::new(),
             errors: Vec::new(),
+            no_struct_literal: false,
         }
     }
 
     /// the token at the cursor. the token stream is expected to end with
     /// `Eof`; peek keeps returning it past the end rather than panicking.
     pub fn peek(&self) -> &Token {
+        self.peek_nth(0)
+    }
+
+    /// the token `n` positions past the cursor, clamped to the trailing
+    /// `Eof` so lookahead never runs off the end.
+    fn peek_nth(&self, n: usize) -> &Token {
         self.tokens
-            .get(self.pos)
+            .get(self.pos + n)
             .or_else(|| self.tokens.last())
             .expect("token stream must contain at least Eof")
+    }
+
+    /// re-enables struct literals inside a nested delimiter, where the
+    /// `if cond {` ambiguity can't arise: `if f(P { x: 1 }) { }` is fine.
+    fn with_struct_literals<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let saved = self.no_struct_literal;
+        self.no_struct_literal = false;
+        let out = f(self);
+        self.no_struct_literal = saved;
+        out
     }
 
     pub fn at_eof(&self) -> bool {
@@ -217,7 +243,7 @@ impl<'a> Parser<'a> {
                 }
                 TokenKind::LBracket => {
                     self.advance();
-                    let index = self.parse_expr();
+                    let index = self.with_struct_literals(|p| p.parse_expr());
                     let close = self.expect(TokenKind::RBracket);
                     let span = expr.info.span.merge(close.span);
                     self.leaf(
@@ -245,7 +271,7 @@ impl<'a> Parser<'a> {
             if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
                 break;
             }
-            args.push(self.parse_expr());
+            args.push(self.with_struct_literals(|p| p.parse_expr()));
             if self.peek().kind == TokenKind::Comma {
                 self.advance();
             } else {
@@ -271,7 +297,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// a literal, an identifier, a parenthesized expression, or a block.
+    /// a literal, an identifier, a struct literal, a parenthesized
+    /// expression, or a block.
     fn parse_leaf(&mut self) -> Expr {
         match self.peek().kind {
             TokenKind::LParen => return self.parse_paren(),
@@ -279,6 +306,11 @@ impl<'a> Parser<'a> {
                 let block = self.parse_block();
                 let span = block.info.span;
                 return self.leaf(ExprKind::Block(block), span);
+            }
+            TokenKind::Ident(_)
+                if !self.no_struct_literal && self.peek_nth(1).kind == TokenKind::LBrace =>
+            {
+                return self.parse_struct_literal();
             }
             _ => {}
         }
@@ -315,13 +347,51 @@ impl<'a> Parser<'a> {
             return self.leaf(ExprKind::Unit, open.span.merge(close.span));
         }
 
-        let inner = self.parse_expr();
+        let inner = self.with_struct_literals(|p| p.parse_expr());
         let close = self.expect(TokenKind::RParen);
         // the grouped expression keeps its own node and NodeId; only its
         // span widens to cover the parens, so diagnostics can point at the
         // whole `( ... )` rather than just the inside
         let span = open.span.merge(close.span);
         self.leaf(inner.kind, span)
+    }
+
+    /// `Point { x: 1.0, y: 2.0 }`. only reached when struct literals are
+    /// permitted here; see `no_struct_literal`.
+    fn parse_struct_literal(&mut self) -> Expr {
+        let name = self.expect_ident();
+        self.expect(TokenKind::LBrace);
+        let mut fields = Vec::new();
+
+        loop {
+            // `}` ends the list; Eof would otherwise spin, since nothing
+            // below consumes a token there
+            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
+                break;
+            }
+
+            let field_name = self.expect_ident();
+            self.expect(TokenKind::Colon);
+            // inside the braces the ambiguity is gone, so a nested struct
+            // literal is allowed even in an `if` condition
+            let value = self.with_struct_literals(|p| p.parse_expr());
+            let span = field_name.span.merge(value.info.span);
+            fields.push(FieldInit::new(
+                field_name,
+                value,
+                NodeInfo::new(self.ids.fresh(), span),
+            ));
+
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        let close = self.expect(TokenKind::RBrace);
+        let span = name.span.merge(close.span);
+        self.leaf(ExprKind::StructLit { name, fields }, span)
     }
 
     /// `{ a; b; c }` - a braced sequence of statements. only expression
@@ -342,7 +412,7 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
 
-            let expr = self.parse_expr();
+            let expr = self.with_struct_literals(|p| p.parse_expr());
             let span = expr.info.span;
             stmts.push(Stmt::new(
                 StmtKind::Expr(expr),

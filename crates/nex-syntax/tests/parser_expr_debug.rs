@@ -286,3 +286,52 @@ fn unclosed_postfix_brackets_report_errors_without_hanging() {
     let (_, errors) = parse("f(a,");
     assert_eq!(errors, vec!["expected `)`, found end of file"]);
 }
+
+// ---------------------------------------------------------------------
+// step 3.6: struct literals
+// ---------------------------------------------------------------------
+
+#[test]
+fn parses_a_struct_literal() {
+    assert_eq!(
+        sexp("Point { x: 1.0, y: 2.0 }"),
+        "(struct-lit Point (x 1) (y 2))"
+    );
+}
+
+#[test]
+fn parses_an_empty_struct_literal() {
+    assert_eq!(sexp("Unit {}"), "(struct-lit Unit)");
+}
+
+#[test]
+fn struct_literal_fields_allow_a_trailing_comma() {
+    assert_eq!(sexp("P { x: 1, }"), "(struct-lit P (x 1))");
+}
+
+#[test]
+fn struct_literal_field_values_are_full_expressions() {
+    assert_eq!(sexp("P { x: a + b }"), "(struct-lit P (x (+ a b)))");
+    assert_eq!(
+        sexp("P { x: Q { y: 1 } }"),
+        "(struct-lit P (x (struct-lit Q (y 1))))"
+    );
+}
+
+#[test]
+fn struct_literals_compose_with_postfix_and_infix() {
+    assert_eq!(sexp("P { x: 1 }.x"), "(field (struct-lit P (x 1)) x)");
+    assert_eq!(sexp("f(P { x: 1 })"), "(call f (struct-lit P (x 1)))");
+}
+
+#[test]
+fn a_struct_literal_missing_its_colon_reports_an_error() {
+    let (_, errors) = parse("P { x 1 }");
+    assert_eq!(errors, vec!["expected `:`, found integer literal"]);
+}
+
+#[test]
+fn an_unclosed_struct_literal_reports_an_error_without_hanging() {
+    let (_, errors) = parse("P { x: 1");
+    assert_eq!(errors, vec!["expected `}`, found end of file"]);
+}
