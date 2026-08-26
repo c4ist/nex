@@ -335,3 +335,74 @@ fn an_unclosed_struct_literal_reports_an_error_without_hanging() {
     let (_, errors) = parse("P { x: 1");
     assert_eq!(errors, vec!["expected `}`, found end of file"]);
 }
+
+// ---------------------------------------------------------------------
+// step 3.7: if/else as expressions
+// ---------------------------------------------------------------------
+
+#[test]
+fn parses_an_if_without_an_else() {
+    assert_eq!(sexp("if a { b }"), "(if a (block b))");
+}
+
+#[test]
+fn parses_an_if_else() {
+    assert_eq!(sexp("if a { b } else { c }"), "(if a (block b) (block c))");
+}
+
+// `else if` nests another if-expression in the else arm rather than
+// introducing a dedicated chain node
+#[test]
+fn parses_an_else_if_chain() {
+    assert_eq!(
+        sexp("if a { b } else if c { d } else { e }"),
+        "(if a (block b) (if c (block d) (block e)))"
+    );
+}
+
+#[test]
+fn if_conditions_are_full_expressions() {
+    assert_eq!(sexp("if a + b > c { d }"), "(if (> (+ a b) c) (block d))");
+    assert_eq!(sexp("if f(a) { b }"), "(if (call f a) (block b))");
+}
+
+// the reason the no_struct_literal flag exists: `if x { }` must be a
+// condition plus a body, not a struct literal `x { }` with no body
+#[test]
+fn a_bare_ident_condition_is_not_a_struct_literal() {
+    assert_eq!(sexp("if x { y }"), "(if x (block y))");
+}
+
+// ...but inside a delimiter the ambiguity is gone, so struct literals work
+#[test]
+fn struct_literals_still_parse_inside_a_condition_delimiter() {
+    assert_eq!(
+        sexp("if f(P { x: 1 }) { y }"),
+        "(if (call f (struct-lit P (x 1))) (block y))"
+    );
+    assert_eq!(
+        sexp("if (P { x: 1 }).x { y }"),
+        "(if (field (struct-lit P (x 1)) x) (block y))"
+    );
+}
+
+// and the restriction is scoped to the condition only - the body is a
+// normal block again
+#[test]
+fn struct_literals_parse_again_inside_the_if_body() {
+    assert_eq!(
+        sexp("if a { P { x: 1 } }"),
+        "(if a (block (struct-lit P (x 1))))"
+    );
+}
+
+#[test]
+fn if_is_an_expression_and_composes() {
+    assert_eq!(sexp("{ if a { b } }"), "(block (if a (block b)))");
+}
+
+#[test]
+fn an_if_missing_its_body_reports_an_error() {
+    let (_, errors) = parse("if a");
+    assert_eq!(errors, vec!["expected `{`, found end of file"]);
+}

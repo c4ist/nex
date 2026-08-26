@@ -113,6 +113,17 @@ impl<'a> Parser<'a> {
             .expect("token stream must contain at least Eof")
     }
 
+    /// runs `f` with struct literals disabled, then restores the previous
+    /// setting. saves-and-restores rather than clearing, so a nested
+    /// condition (`if a { }` inside another condition) still behaves.
+    fn without_struct_literals<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let saved = self.no_struct_literal;
+        self.no_struct_literal = true;
+        let out = f(self);
+        self.no_struct_literal = saved;
+        out
+    }
+
     /// re-enables struct literals inside a nested delimiter, where the
     /// `if cond {` ambiguity can't arise: `if f(P { x: 1 }) { }` is fine.
     fn with_struct_literals<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
@@ -307,6 +318,7 @@ impl<'a> Parser<'a> {
                 let span = block.info.span;
                 return self.leaf(ExprKind::Block(block), span);
             }
+            TokenKind::If => return self.parse_if(),
             TokenKind::Ident(_)
                 if !self.no_struct_literal && self.peek_nth(1).kind == TokenKind::LBrace =>
             {
@@ -356,6 +368,47 @@ impl<'a> Parser<'a> {
         self.leaf(inner.kind, span)
     }
 
+    /// `if cond { .. }`, `if cond { .. } else { .. }`, or an `else if`
+    /// chain. both arms are blocks; `else` is optional.
+    fn parse_if(&mut self) -> Expr {
+        let if_tok = self.expect(TokenKind::If);
+
+        // a bare `Ident {` in condition position is the condition followed
+        // by the body's brace, never a struct literal
+        let cond = self.without_struct_literals(|p| p.parse_expr());
+
+        let then = self.parse_block();
+        let then_span = then.info.span;
+        let then = self.leaf(ExprKind::Block(then), then_span);
+
+        let mut span = if_tok.span.merge(then_span);
+        let else_ = if self.peek().kind == TokenKind::Else {
+            self.advance();
+            // `else if` chains by nesting another if-expression in the
+            // else arm rather than by a dedicated node
+            let branch = if self.peek().kind == TokenKind::If {
+                self.parse_if()
+            } else {
+                let block = self.parse_block();
+                let block_span = block.info.span;
+                self.leaf(ExprKind::Block(block), block_span)
+            };
+            span = span.merge(branch.info.span);
+            Some(Box::new(branch))
+        } else {
+            None
+        };
+
+        self.leaf(
+            ExprKind::If {
+                cond: Box::new(cond),
+                then: Box::new(then),
+                else_,
+            },
+            span,
+        )
+    }
+
     /// `Point { x: 1.0, y: 2.0 }`. only reached when struct literals are
     /// permitted here; see `no_struct_literal`.
     fn parse_struct_literal(&mut self) -> Expr {
@@ -398,6 +451,12 @@ impl<'a> Parser<'a> {
     /// statements exist so far; `let`/`return`/loops arrive in phase 4.
     fn parse_block(&mut self) -> Block {
         let open = self.expect(TokenKind::LBrace);
+        if open.kind != TokenKind::LBrace {
+            // there is no block here at all. returning early keeps one
+            // real problem to one diagnostic - carrying on would also
+            // report a missing `}` for a brace the source never opened.
+            return Block::new(Vec::new(), NodeInfo::dummy(open.span));
+        }
         let mut stmts = Vec::new();
 
         loop {
