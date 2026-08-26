@@ -4,17 +4,16 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 3.2
+last_step = 3.3
 current_phase = 3 (Parser: expressions) - in progress
-next_step = 3.3 (pratt parser for binary/unary operators with full
-            precedence table)
+next_step = 3.4 (parenthesized expressions and blocks-as-expressions)
 
 Phase status
 ------------
 [x] Phase 0  Foundations
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
-[~] Phase 3  Parser: expressions   (3.1-3.2 done)
+[~] Phase 3  Parser: expressions   (3.1-3.3 done)
 [ ] Phase 4  Parser: statements & items
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
@@ -83,7 +82,14 @@ Design notes
   now it records one "item parsing arrives in Phase 4" ParseError per
   leftover token and consumes it, so non-empty input still terminates
   instead of looping forever with nothing to do.
-- parse_expr() (3.2) only handles leaves: Int/Float/Str/Bool/Ident. On a
+- parse_expr() (3.3) is a pratt loop. The precedence ladder lives in one
+  table, infix_binding_power(), running lowest-to-highest: || && compare
+  | ^ & shift +- */% then PREFIX_BP for unary. Left-associativity is
+  encoded as right_bp = left_bp + 1; there are no right-assoc operators
+  yet. Comparisons are left-associative rather than non-associative as in
+  rust, so `a < b == c` parses instead of erroring - revisit if that turns
+  out to confuse rather than merely be useless.
+- parse_leaf() (3.2) handles Int/Float/Str/Bool/Ident. On a
   token that can't start an expression, it records a ParseError and returns
   ExprKind::Unit with NodeInfo::dummy(span) as the recovery placeholder -
   reusing Unit rather than adding a dedicated error-expression kind, since

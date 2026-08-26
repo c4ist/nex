@@ -1,4 +1,5 @@
-//! step 3.2: parsing leaf expressions (literals and identifiers).
+//! parsing expressions: leaves (step 3.2) and the pratt operator ladder
+//! (step 3.3).
 
 use nex_syntax::{parse_expr, print_expr};
 
@@ -10,6 +11,14 @@ fn parse(src: &str) -> (String, Vec<String>) {
         print_expr(&expr),
         errors.into_iter().map(|e| e.message).collect(),
     )
+}
+
+/// parses `src` and asserts it produced no errors, returning the s-expr
+#[track_caller]
+fn sexp(src: &str) -> String {
+    let (printed, errors) = parse(src);
+    assert_eq!(errors, Vec::<String>::new(), "errors parsing {src:?}");
+    printed
 }
 
 #[test]
@@ -63,5 +72,83 @@ fn reports_an_error_on_a_non_expression_token() {
 fn reports_an_error_at_end_of_file() {
     let (printed, errors) = parse("");
     assert_eq!(printed, "()");
+    assert_eq!(errors, vec!["expected an expression, found end of file"]);
+}
+
+// ---------------------------------------------------------------------
+// step 3.3: operator precedence and associativity
+// ---------------------------------------------------------------------
+
+#[test]
+fn multiplication_binds_tighter_than_addition() {
+    assert_eq!(sexp("a + b * c"), "(+ a (* b c))");
+    assert_eq!(sexp("a * b + c"), "(+ (* a b) c)");
+}
+
+#[test]
+fn and_binds_tighter_than_or() {
+    assert_eq!(sexp("a && b || c"), "(|| (&& a b) c)");
+    assert_eq!(sexp("a || b && c"), "(|| a (&& b c))");
+}
+
+#[test]
+fn arithmetic_operators_are_left_associative() {
+    assert_eq!(sexp("a - b - c"), "(- (- a b) c)");
+    assert_eq!(sexp("a / b / c"), "(/ (/ a b) c)");
+}
+
+#[test]
+fn prefix_operators_bind_tighter_than_any_infix() {
+    assert_eq!(sexp("-a * b"), "(* (- a) b)");
+    assert_eq!(sexp("!a && b"), "(&& (! a) b)");
+    // ...but the operand of a prefix op is itself only a prefix expression,
+    // so the infix operator still wins the wider expression
+    assert_eq!(sexp("-a + -b"), "(+ (- a) (- b))");
+}
+
+#[test]
+fn prefix_operators_stack() {
+    assert_eq!(sexp("--a"), "(- (- a))");
+    assert_eq!(sexp("!!a"), "(! (! a))");
+    assert_eq!(sexp("-!a"), "(- (! a))");
+}
+
+#[test]
+fn comparison_binds_looser_than_arithmetic() {
+    assert_eq!(sexp("a + b < c * d"), "(< (+ a b) (* c d))");
+    assert_eq!(sexp("a == b + c"), "(== a (+ b c))");
+}
+
+#[test]
+fn bitwise_ladder_orders_or_xor_and_shift() {
+    // | looser than ^ looser than & looser than << looser than +
+    assert_eq!(sexp("a | b ^ c"), "(| a (^ b c))");
+    assert_eq!(sexp("a ^ b & c"), "(^ a (& b c))");
+    assert_eq!(sexp("a & b << c"), "(& a (<< b c))");
+    assert_eq!(sexp("a << b + c"), "(<< a (+ b c))");
+}
+
+// one expression exercising every level of the ladder at once, loosest to
+// tightest: || && == | ^ & << + *
+#[test]
+fn the_full_precedence_ladder_nests_correctly() {
+    assert_eq!(
+        sexp("a || b && c == d | e ^ f & g << h + i * j"),
+        "(|| a (&& b (== c (| d (^ e (& f (<< g (+ h (* i j)))))))))"
+    );
+}
+
+// comparisons are left-associative here rather than non-associative as in
+// rust; `a < b == c` parses instead of erroring. revisit if the type
+// checker makes chained comparisons confusing rather than merely useless.
+#[test]
+fn comparisons_chain_left_associatively() {
+    assert_eq!(sexp("a < b == c"), "(== (< a b) c)");
+}
+
+#[test]
+fn a_missing_right_operand_reports_one_error() {
+    let (printed, errors) = parse("a +");
+    assert_eq!(printed, "(+ a ())");
     assert_eq!(errors, vec!["expected an expression, found end of file"]);
 }

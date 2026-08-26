@@ -10,10 +10,9 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 3.2
+- **last step:** 3.3
 - **current phase:** 3 (Parser: expressions) — in progress
-- **next step:** 3.3 — Pratt parser for binary/unary operators with the full
-  precedence table
+- **next step:** 3.4 — parenthesized expressions and blocks-as-expressions
 
 ## Phase status
 
