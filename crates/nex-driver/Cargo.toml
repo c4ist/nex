@@ -12,4 +12,6 @@ path = "src/main.rs"
 
 [dependencies]
 nex-lexer.workspace = true
+nex-syntax.workspace = true
 clap.workspace = true
+ariadne.workspace = true

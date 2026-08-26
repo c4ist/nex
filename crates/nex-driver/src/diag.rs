@@ -1,10 +1,12 @@
-//! tiny source-snippet diagnostic renderer.
+//! source-annotated diagnostic rendering, backed by `ariadne`.
 //!
-//! dependency-free on purpose for now. swap it for `ariadne` in phase 3 once the
-//! parser starts producing richer diagnostics.
+//! the hand-rolled renderer this replaced (steps 1.11a-3.10) kept the crate
+//! dependency-free while only the lexer produced errors. now that the parser
+//! reports spans too, `ariadne` handles the labels, gutters and multi-line
+//! spans instead.
 
+use ariadne::{Config, Label, Report, ReportKind, Source};
 use nex_lexer::Span;
-use std::fmt::Write as _;
 
 pub struct Diagnostic {
     pub message: String,
@@ -12,133 +14,109 @@ pub struct Diagnostic {
     pub help: Option<String>,
 }
 
+/// renders every diagnostic against `src`, one report each.
+///
+/// colour is off: the output is compared in tests and piped to files at
+/// least as often as it is read on a terminal.
 pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
     let mut out = String::new();
     for diagnostic in diagnostics {
-        let (line_no, col_no, line_start, line_text) = locate(src, diagnostic.span.start as usize);
-
-        let _ = writeln!(out, "error: {}", diagnostic.message);
-        let _ = writeln!(out, "  --> {path}:{line_no}:{col_no}");
-
-        let gutter_width = line_no.to_string().len();
-        let pad = " ".repeat(gutter_width);
-        let _ = writeln!(out, "{pad} |");
-        let _ = writeln!(out, "{line_no} | {line_text}");
-
-        // both offsets are byte offsets into line_text; the caret row is
-        // measured in display columns, so convert through display_width
-        // rather than counting bytes (a multi-byte char is one column here,
-        // not one column per byte)
-        let start_col = diagnostic.span.start as usize - line_start;
-        let end_col = ((diagnostic.span.end as usize).min(line_start + line_text.len()))
-            .saturating_sub(line_start)
-            .max(start_col);
-        let width = display_width(&line_text[start_col..end_col]).max(1);
-        let _ = writeln!(
-            out,
-            "{pad} | {}{}",
-            " ".repeat(display_width(&line_text[..start_col])),
-            "^".repeat(width)
-        );
-
-        if let Some(help) = &diagnostic.help {
-            let _ = writeln!(out, "{pad} = help: {help}");
-        }
-        out.push('\n');
+        out.push_str(&render_one(path, src, diagnostic));
     }
     out
 }
 
-/// line and col are 1-based
-fn locate(src: &str, offset: usize) -> (usize, usize, usize, &str) {
-    let offset = offset.min(src.len());
-    let line_start = src[..offset].rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line_end = src[line_start..]
-        .find('\n')
-        .map(|i| line_start + i)
-        .unwrap_or(src.len());
-    let line_text = &src[line_start..line_end];
-    let line_no = src[..line_start].matches('\n').count() + 1;
-    let col_no = src[line_start..offset].chars().count() + 1;
-    (line_no, col_no, line_start, line_text)
+/// nex spans are byte offsets; `ariadne`'s `Source` indexes by character.
+/// they only coincide for ascii, so a multi-byte character earlier in the
+/// line would otherwise push the reported column to the right.
+///
+/// a byte offset that isn't on a character boundary is rounded down rather
+/// than panicking - spans should always land on one, but a renderer is the
+/// wrong place to enforce that.
+fn char_offset(src: &str, byte: usize) -> usize {
+    let mut byte = byte.min(src.len());
+    while byte > 0 && !src.is_char_boundary(byte) {
+        byte -= 1;
+    }
+    src[..byte].chars().count()
 }
 
-/// char count, so the caret lines up under multi-byte text
-fn display_width(text: &str) -> usize {
-    text.chars().count()
+fn render_one(path: &str, src: &str, diagnostic: &Diagnostic) -> String {
+    let start = char_offset(src, diagnostic.span.start as usize);
+    // `ariadne` panics on an empty or reversed range, and the `Eof` token's
+    // span is empty by construction, so widen it to one character.
+    let end = char_offset(src, diagnostic.span.end as usize).max(start + 1);
+    let span = (path, start..end);
+
+    let mut report = Report::build(ReportKind::Error, span.clone())
+        .with_config(Config::default().with_color(false))
+        .with_message(&diagnostic.message)
+        .with_label(Label::new(span).with_message(&diagnostic.message));
+
+    if let Some(help) = &diagnostic.help {
+        report = report.with_help(help);
+    }
+
+    let mut buf = Vec::new();
+    // writing into a Vec cannot fail, and a diagnostic is the wrong place
+    // to surface an io error anyway
+    let _ = report.finish().write((path, Source::from(src)), &mut buf);
+    String::from_utf8_lossy(&buf).into_owned()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn locate_finds_line_and_column() {
-        let src = "let x = 1;\nlet y = 2;\n";
-        let (line, col, _, text) = locate(src, 15);
-        assert_eq!((line, col), (2, 5));
-        assert_eq!(text, "let y = 2;");
-    }
-
-    #[test]
-    fn render_points_at_the_span() {
-        let src = "let x = @;\n";
+    fn one(src: &str, span: Span, help: Option<&str>) -> String {
         let diagnostics = vec![Diagnostic {
             message: "unexpected character `@`".into(),
-            span: Span::new(8, 9),
-            help: Some("remove it".into()),
-        }];
-        let output = render("test.nex", src, &diagnostics);
-        assert!(output.contains("--> test.nex:1:9"), "{output}");
-        assert!(output.contains("1 | let x = @;"), "{output}");
-        assert!(output.contains("        ^"), "{output}");
-        assert!(output.contains("help: remove it"), "{output}");
-    }
-
-    // the caret row is measured in display columns, so a multi-byte char
-    // gets one caret, not one per byte
-    #[test]
-    fn carets_count_characters_not_bytes() {
-        let src = "let emoji = 😀\n";
-        let span = Span::from_usize(12, 12 + '😀'.len_utf8());
-        let diagnostics = vec![Diagnostic {
-            message: "unexpected character `😀`".into(),
             span,
-            help: None,
+            help: help.map(str::to_string),
         }];
-        let output = render("test.nex", src, &diagnostics);
-        let caret_line = output
-            .lines()
-            .find(|line| line.contains('^'))
-            .expect("a caret row");
-        assert_eq!(caret_line.matches('^').count(), 1, "{output}");
+        render("test.nex", src, &diagnostics)
     }
 
-    // the leading pad is also display columns, so the caret lands under the
-    // offending text even when earlier chars on the line are multi-byte
     #[test]
-    fn caret_lines_up_after_multibyte_characters() {
+    fn render_names_the_file_and_the_line() {
+        let output = one("let x = @;\n", Span::new(8, 9), Some("remove it"));
+        assert!(output.contains("test.nex:1:9"), "{output}");
+        assert!(output.contains("let x = @;"), "{output}");
+        assert!(output.contains("unexpected character `@`"), "{output}");
+        assert!(output.contains("remove it"), "{output}");
+    }
+
+    #[test]
+    fn render_omits_the_help_line_when_there_is_none() {
+        let output = one("let x = @;\n", Span::new(8, 9), None);
+        assert!(!output.contains("Help"), "{output}");
+    }
+
+    #[test]
+    fn render_points_at_the_right_line_of_a_multi_line_file() {
+        let src = "let x = 1;\nlet y = @;\n";
+        let at = src.find('@').expect("an @ in the fixture");
+        let output = one(src, Span::from_usize(at, at + 1), None);
+        assert!(output.contains("test.nex:2:9"), "{output}");
+    }
+
+    // multi-byte characters must not shift the reported column, and must
+    // not panic the renderer
+    #[test]
+    fn render_handles_multibyte_characters() {
         let src = "let café = @\n";
         let at = src.find('@').expect("an @ in the fixture");
-        let diagnostics = vec![Diagnostic {
-            message: "unexpected character `@`".into(),
-            span: Span::from_usize(at, at + 1),
-            help: None,
-        }];
-        let output = render("test.nex", src, &diagnostics);
-        let caret_line = output
-            .lines()
-            .find(|line| line.contains('^'))
-            .expect("a caret row");
-        let source_line = output
-            .lines()
-            .find(|line| line.contains("let café"))
-            .expect("the source row");
+        let output = one(src, Span::from_usize(at, at + 1), None);
+        assert!(output.contains("test.nex:1:12"), "{output}");
+    }
 
-        // both rows share the `N | ` gutter, so the caret's column in the
-        // caret row must equal the `@`'s column in the source row
-        let caret_col = caret_line.chars().position(|c| c == '^').unwrap();
-        let at_col = source_line.chars().position(|c| c == '@').unwrap();
-        assert_eq!(caret_col, at_col, "{output}");
+    // the Eof token's span is empty; ariadne rejects an empty range, so
+    // render widens it rather than panicking
+    #[test]
+    fn render_survives_an_empty_span() {
+        let src = "let x =";
+        let end = src.len();
+        let output = one(src, Span::from_usize(end, end), None);
+        assert!(output.contains("test.nex"), "{output}");
     }
 }

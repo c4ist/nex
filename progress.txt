@@ -4,16 +4,17 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 3.10
-current_phase = 3 (Parser: expressions) - in progress
-next_step = 3.11 (wire ariadne pretty diagnostics rendering)
+last_step = 3.11
+current_phase = 4 (Parser: statements & items) - starting
+next_step = 4.1 (let / let mut with optional type annotation and required
+            initializer)
 
 Phase status
 ------------
 [x] Phase 0  Foundations
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
-[~] Phase 3  Parser: expressions   (3.1-3.10 done)
+[x] Phase 3  Parser: expressions
 [ ] Phase 4  Parser: statements & items
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
@@ -29,8 +30,6 @@ Phase status
 
 Pending / deferred
 ------------------
-- ariadne diagnostics deferred to step 3.11; nex-driver currently uses its own
-  renderer in crates/nex-driver/src/diag.rs.
 - CI does not yet install LLVM; needed from step 8.2.
 - No benchmarks yet; parser throughput baseline is due at step 4.12.
 - step 2.8 coverage review (docs/src/content/docs/internals/ast-coverage.md)
@@ -144,6 +143,14 @@ Design notes
   always terminates. The block loop compares the error count before and
   after each statement to decide whether to synchronize, so a block
   reports every broken statement instead of only the first.
+- ariadne (3.11) replaced the hand-rolled renderer in nex-driver/diag.rs.
+  Pinned to =0.5.1: 0.6.0 does not build on our 1.83 msrv (it uses
+  f32::max/min in a const fn). Colour is off so output is stable in tests
+  and when piped. IMPORTANT: nex spans are BYTE offsets but ariadne's
+  Source indexes by CHARACTER, so diag.rs converts - without it a
+  multi-byte char earlier in the line shifts the reported column right.
+  Empty spans (the Eof token has one) are widened by a char, since
+  ariadne panics on an empty range.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

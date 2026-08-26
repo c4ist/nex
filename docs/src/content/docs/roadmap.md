@@ -10,9 +10,9 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 3.10
-- **current phase:** 3 (Parser: expressions) — in progress
-- **next step:** 3.11 — `ariadne` pretty diagnostics
+- **last step:** 3.11
+- **current phase:** 4 (Parser: statements & items) — starting
+- **next step:** 4.1 — `let` / `let mut` statements
 
 ## Phase status
 
@@ -21,7 +21,7 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 | 0     | Foundations                        | done        |
 | 1     | Lexer                              | done        |
 | 2     | AST design                         | done        |
-| 3     | Parser: expressions                | in progress |
+| 3     | Parser: expressions                | done        |
 | 4     | Parser: statements & items         | planned     |
 | 5     | Tree-walking interpreter           | planned     |
 | 6     | Name resolution + type checker     | planned     |
@@ -62,8 +62,6 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Deferred / pending
 
-- `ariadne` diagnostics — deferred to step 3.11; the driver currently uses its
-  own renderer in `crates/nex-driver/src/diag.rs`.
 - CI does not yet install LLVM — needed from step 8.2.
 - No benchmarks yet — parser throughput baseline is due at step 4.12.
 - Block comments (`/* */`) arrive in Phase 7; they currently lex as operators.

@@ -20,6 +20,9 @@ nex-syntax = { path = "crates/nex-syntax" }
 # became msrv-aware in 1.84 so these have to be exact.
 clap = { version = "=4.5.23", features = ["derive"] }
 insta = "=1.41.1"
+# pretty source-annotated diagnostics for the cli (step 3.11), replacing the
+# hand-rolled renderer that stood in until the parser needed richer output.
+ariadne = "=0.5.1"
 
 [profile.release]
 lto = "thin"
