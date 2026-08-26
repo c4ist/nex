@@ -179,6 +179,28 @@ impl<'a> Parser<'a> {
         &self.errors
     }
 
+    /// after a failed statement, skip forward to the next plausible
+    /// statement boundary so one bad statement doesn't cascade into a
+    /// pile of errors about the tokens that followed it.
+    ///
+    /// `;` is consumed (it ends the broken statement); `}` is left in
+    /// place for the enclosing block to close on. stops at `Eof` either
+    /// way, so this always terminates.
+    fn synchronize(&mut self) {
+        loop {
+            match self.peek().kind {
+                TokenKind::Eof | TokenKind::RBrace => return,
+                TokenKind::Semi => {
+                    self.advance();
+                    return;
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+    }
+
     /// parses a full expression, honouring operator precedence.
     pub fn parse_expr(&mut self) -> Expr {
         self.parse_expr_bp(0)
@@ -730,12 +752,21 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
 
+            let errors_before = self.errors.len();
             let expr = self.with_struct_literals(|p| p.parse_expr());
             let span = expr.info.span;
             stmts.push(Stmt::new(
                 StmtKind::Expr(expr),
                 NodeInfo::new(self.ids.fresh(), span),
             ));
+
+            // this statement didn't parse cleanly: skip to the next
+            // boundary and keep going, so the block reports every broken
+            // statement rather than only the first
+            if self.errors.len() > errors_before {
+                self.synchronize();
+                continue;
+            }
 
             // a trailing `;` is optional before `}`; the block's value is
             // its last expression statement either way

@@ -10,9 +10,9 @@ one micro-step at a time in [`progress.txt`](https://github.com/c4ist/nex/blob/m
 
 ## Current position
 
-- **last step:** 3.9
+- **last step:** 3.10
 - **current phase:** 3 (Parser: expressions) — in progress
-- **next step:** 3.10 — parser error recovery
+- **next step:** 3.11 — `ariadne` pretty diagnostics
 
 ## Phase status
 

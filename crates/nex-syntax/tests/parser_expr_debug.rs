@@ -555,3 +555,58 @@ fn open_ended_ranges_are_not_supported_yet() {
     let (_, errors) = parse("a..");
     assert_eq!(errors, vec!["expected an expression, found end of file"]);
 }
+
+// ---------------------------------------------------------------------
+// step 3.10: error recovery
+// ---------------------------------------------------------------------
+
+// the plan's criterion for this step: three deliberate errors, all three
+// reported in one pass
+#[test]
+fn three_broken_statements_report_three_errors() {
+    let (_, errors) = parse("{ else; else; else }");
+    assert_eq!(
+        errors,
+        vec![
+            "expected an expression, found `else`",
+            "expected an expression, found `else`",
+            "expected an expression, found `else`",
+        ]
+    );
+}
+
+// recovery skips to the next `;`, so the junk after a bad statement
+// doesn't produce a second error of its own
+#[test]
+fn recovery_skips_the_rest_of_a_broken_statement() {
+    let (_, errors) = parse("{ else a b c; d }");
+    assert_eq!(errors, vec!["expected an expression, found `else`"]);
+}
+
+// a good statement after a bad one still parses
+#[test]
+fn parsing_continues_after_a_recovered_error() {
+    let (printed, errors) = parse("{ else; a + b }");
+    assert_eq!(errors, vec!["expected an expression, found `else`"]);
+    assert!(printed.contains("(+ a b)"), "{printed}");
+}
+
+// `}` is left for the block to close on rather than being swallowed
+#[test]
+fn recovery_stops_at_the_closing_brace() {
+    let (_, errors) = parse("{ else }");
+    assert_eq!(errors, vec!["expected an expression, found `else`"]);
+}
+
+// recovery must not spin at Eof, where advance() is a no-op
+#[test]
+fn recovery_terminates_at_end_of_file() {
+    let (_, errors) = parse("{ else");
+    assert_eq!(
+        errors,
+        vec![
+            "expected an expression, found `else`",
+            "expected `}`, found end of file",
+        ]
+    );
+}
