@@ -152,3 +152,67 @@ fn a_missing_right_operand_reports_one_error() {
     assert_eq!(printed, "(+ a ())");
     assert_eq!(errors, vec!["expected an expression, found end of file"]);
 }
+
+// ---------------------------------------------------------------------
+// step 3.4: parentheses and blocks-as-expressions
+// ---------------------------------------------------------------------
+
+#[test]
+fn parentheses_override_precedence() {
+    assert_eq!(sexp("(a + b) * c"), "(* (+ a b) c)");
+    assert_eq!(sexp("a * (b + c)"), "(* a (+ b c))");
+    assert_eq!(sexp("-(a + b)"), "(- (+ a b))");
+}
+
+#[test]
+fn redundant_parentheses_leave_no_trace() {
+    // parens group, they don't produce a node of their own
+    assert_eq!(sexp("((a))"), "a");
+    assert_eq!(sexp("(a + b)"), "(+ a b)");
+}
+
+#[test]
+fn empty_parentheses_are_the_unit_literal() {
+    assert_eq!(sexp("()"), "()");
+}
+
+#[test]
+fn parses_an_empty_block() {
+    assert_eq!(sexp("{}"), "(block)");
+}
+
+#[test]
+fn parses_a_block_of_expression_statements() {
+    assert_eq!(sexp("{ a }"), "(block a)");
+    assert_eq!(sexp("{ a; b }"), "(block a b)");
+    // a trailing semicolon is allowed
+    assert_eq!(sexp("{ a; b; }"), "(block a b)");
+}
+
+#[test]
+fn blocks_nest_and_compose_with_operators() {
+    assert_eq!(sexp("{ { a } }"), "(block (block a))");
+    assert_eq!(sexp("{ a + b }"), "(block (+ a b))");
+}
+
+#[test]
+fn an_unclosed_paren_reports_an_error_without_hanging() {
+    let (_, errors) = parse("(a + b");
+    assert_eq!(errors, vec!["expected `)`, found end of file"]);
+}
+
+// regression: `advance` is a no-op at Eof, so an unterminated block must
+// break out explicitly or the statement loop spins forever
+#[test]
+fn an_unclosed_block_reports_an_error_without_hanging() {
+    let (printed, errors) = parse("{ a; b");
+    assert_eq!(printed, "(block a b)");
+    assert_eq!(errors, vec!["expected `}`, found end of file"]);
+}
+
+#[test]
+fn an_unclosed_empty_block_reports_an_error_without_hanging() {
+    let (printed, errors) = parse("{");
+    assert_eq!(printed, "(block)");
+    assert_eq!(errors, vec!["expected `}`, found end of file"]);
+}

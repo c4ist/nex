@@ -4,9 +4,10 @@
 //! records a "not implemented yet" error and moves on, the same way
 //! `nex-driver`'s unfinished subcommands do.
 
-use crate::expr::{BinaryOp, Expr, ExprKind, UnaryOp};
+use crate::expr::{BinaryOp, Block, Expr, ExprKind, UnaryOp};
 use crate::module::Module;
 use crate::node::{NodeIdGen, NodeInfo, Spanned};
+use crate::stmt::{Stmt, StmtKind};
 use nex_lexer::{Span, Token, TokenKind};
 
 /// binding power of the prefix operators (`-x`, `!x`). higher than every
@@ -181,8 +182,18 @@ impl<'a> Parser<'a> {
         self.parse_leaf()
     }
 
-    /// a literal or an identifier.
+    /// a literal, an identifier, a parenthesized expression, or a block.
     fn parse_leaf(&mut self) -> Expr {
+        match self.peek().kind {
+            TokenKind::LParen => return self.parse_paren(),
+            TokenKind::LBrace => {
+                let block = self.parse_block();
+                let span = block.info.span;
+                return self.leaf(ExprKind::Block(block), span);
+            }
+            _ => {}
+        }
+
         let tok = self.advance();
         match tok.kind {
             TokenKind::Int(v) => self.leaf(ExprKind::Int(v), tok.span),
@@ -203,6 +214,64 @@ impl<'a> Parser<'a> {
                 Expr::new(ExprKind::Unit, NodeInfo::dummy(tok.span))
             }
         }
+    }
+
+    /// `(expr)` - the parens only group, they leave no node of their own.
+    /// `()` is the unit literal.
+    fn parse_paren(&mut self) -> Expr {
+        let open = self.expect(TokenKind::LParen);
+
+        if self.peek().kind == TokenKind::RParen {
+            let close = self.advance();
+            return self.leaf(ExprKind::Unit, open.span.merge(close.span));
+        }
+
+        let inner = self.parse_expr();
+        let close = self.expect(TokenKind::RParen);
+        // the grouped expression keeps its own node and NodeId; only its
+        // span widens to cover the parens, so diagnostics can point at the
+        // whole `( ... )` rather than just the inside
+        let span = open.span.merge(close.span);
+        self.leaf(inner.kind, span)
+    }
+
+    /// `{ a; b; c }` - a braced sequence of statements. only expression
+    /// statements exist so far; `let`/`return`/loops arrive in phase 4.
+    fn parse_block(&mut self) -> Block {
+        let open = self.expect(TokenKind::LBrace);
+        let mut stmts = Vec::new();
+
+        loop {
+            match self.peek().kind {
+                TokenKind::RBrace => break,
+                // an unterminated block would otherwise spin forever here:
+                // `advance` is a no-op at Eof, so `parse_expr` would keep
+                // returning a dummy without consuming anything. bail out
+                // through `expect` so the message matches the one a
+                // half-parsed block (`{ a; b`) produces below.
+                TokenKind::Eof => break,
+                _ => {}
+            }
+
+            let expr = self.parse_expr();
+            let span = expr.info.span;
+            stmts.push(Stmt::new(
+                StmtKind::Expr(expr),
+                NodeInfo::new(self.ids.fresh(), span),
+            ));
+
+            // a trailing `;` is optional before `}`; the block's value is
+            // its last expression statement either way
+            if self.peek().kind == TokenKind::Semi {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        let close = self.expect(TokenKind::RBrace);
+        let span = open.span.merge(close.span);
+        Block::new(stmts, NodeInfo::new(self.ids.fresh(), span))
     }
 
     fn leaf(&mut self, kind: ExprKind, span: Span) -> Expr {
