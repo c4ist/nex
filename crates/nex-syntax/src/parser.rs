@@ -15,14 +15,20 @@ use nex_lexer::{Span, Token, TokenKind};
 /// infix operator, so `-a * b` parses as `(-a) * b`.
 const PREFIX_BP: u8 = 19;
 
+/// binding power of `..` and `..=`, looser than every operator in
+/// `infix_binding_power` (whose lowest, `||`, is 1). ranges don't chain:
+/// parsing the end at `RANGE_BP + 1` means `a..b..c` stops after `a..b`.
+const RANGE_BP: u8 = 0;
+
 /// `(op, left_bp, right_bp)` for an infix operator, or `None` if the token
 /// doesn't start one. every operator here is left-associative, encoded as
 /// `right_bp == left_bp + 1`, so `a - b - c` parses as `(a - b) - c`.
 ///
-/// the ladder runs lowest-to-highest exactly as the spec orders it: `||`
-/// binds loosest, arithmetic tightest. ranges (`..`, `..=`) sit *below*
-/// `||` and arrive in step 3.9; postfix call/field/index bind tighter than
-/// any prefix operator and arrive in step 3.5.
+/// the ladder runs lowest-to-highest: `||` binds loosest of the operators
+/// listed here, arithmetic tightest. ranges (`..`, `..=`) bind looser
+/// still and are handled separately in `parse_expr_bp`, since they build
+/// an `ExprKind::Range` rather than a `Binary`. postfix call/field/index
+/// bind tighter than any prefix operator; see `parse_postfix`.
 fn infix_binding_power(kind: &TokenKind) -> Option<(BinaryOp, u8, u8)> {
     use TokenKind as T;
     let (op, bp) = match kind {
@@ -195,6 +201,27 @@ impl<'a> Parser<'a> {
                     op: Spanned::new(op, op_tok.span),
                     lhs: Box::new(lhs),
                     rhs: Box::new(rhs),
+                },
+                span,
+            );
+        }
+
+        // ranges bind looser than every operator above, so they fold in
+        // last and only at the outermost level: `a + 1 .. b * 2` is one
+        // range between two arithmetic expressions, and `a .. b || c`
+        // means `a .. (b || c)`. parsing the end above RANGE_BP is what
+        // stops `a..b..c` from chaining.
+        if min_bp == RANGE_BP && matches!(self.peek().kind, TokenKind::DotDot | TokenKind::DotDotEq)
+        {
+            let op_tok = self.advance();
+            let inclusive = op_tok.kind == TokenKind::DotDotEq;
+            let end = self.parse_expr_bp(RANGE_BP + 1);
+            let span = lhs.info.span.merge(end.info.span);
+            lhs = self.leaf(
+                ExprKind::Range {
+                    start: Box::new(lhs),
+                    end: Box::new(end),
+                    inclusive,
                 },
                 span,
             );

@@ -503,3 +503,55 @@ fn an_unclosed_match_reports_an_error_without_hanging() {
     let (_, errors) = parse("match x { _ => a");
     assert_eq!(errors, vec!["expected `}`, found end of file"]);
 }
+
+// ---------------------------------------------------------------------
+// step 3.9: range expressions
+// ---------------------------------------------------------------------
+
+#[test]
+fn parses_exclusive_and_inclusive_ranges() {
+    assert_eq!(sexp("0..10"), "(range 0 10)");
+    assert_eq!(sexp("0..=10"), "(range-incl 0 10)");
+    assert_eq!(sexp("a..b"), "(range a b)");
+}
+
+// `0..10` must lex as Int DotDot Int, not as two floats
+#[test]
+fn a_range_between_integers_is_not_a_float() {
+    assert_eq!(sexp("0..10"), "(range 0 10)");
+}
+
+// ranges bind looser than every other operator
+#[test]
+fn ranges_bind_looser_than_arithmetic_and_logic() {
+    assert_eq!(sexp("a + 1..b * 2"), "(range (+ a 1) (* b 2))");
+    assert_eq!(sexp("a..b || c"), "(range a (|| b c))");
+}
+
+#[test]
+fn range_endpoints_may_be_postfix_chains() {
+    assert_eq!(sexp("a.lo..f(b)"), "(range (field a lo) (call f b))");
+}
+
+#[test]
+fn ranges_appear_inside_calls_and_indexes() {
+    assert_eq!(sexp("f(0..n)"), "(call f (range 0 n))");
+    assert_eq!(sexp("a[0..n]"), "(index a (range 0 n))");
+}
+
+// ranges don't chain: parsing the end above RANGE_BP stops the second
+// `..`, so `a..b..c` yields `a..b` and leaves `..c` unconsumed rather
+// than nesting. (nothing rejects the leftovers yet - a trailing-token
+// check belongs to whole-file parsing in phase 4.)
+#[test]
+fn ranges_do_not_chain() {
+    assert_eq!(sexp("a..b..c"), "(range a b)");
+}
+
+// known gap: ExprKind::Range requires both endpoints, so the open-ended
+// forms rust spells `a..`, `..b` and `..` have nowhere to go in the AST
+#[test]
+fn open_ended_ranges_are_not_supported_yet() {
+    let (_, errors) = parse("a..");
+    assert_eq!(errors, vec!["expected an expression, found end of file"]);
+}
