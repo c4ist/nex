@@ -18,13 +18,14 @@ fn debug_round_trips_a_let_statement() {
         StmtKind::Let {
             mutable: false,
             name: Spanned::new("x".to_string(), Span::new(4, 5)),
+            ty: None,
             value: int(&mut ids, 5, Span::new(8, 9)),
         },
         info(&mut ids, Span::new(0, 10)),
     );
     assert_eq!(
         format!("{stmt:?}"),
-        "Stmt { info: #1@0..10, kind: Let { mutable: false, name: \"x\"@4..5, value: Expr { info: #0@8..9, kind: Int(5) } } }"
+        "Stmt { info: #1@0..10, kind: Let { mutable: false, name: \"x\"@4..5, ty: None, value: Expr { info: #0@8..9, kind: Int(5) } } }"
     );
 }
 
@@ -36,6 +37,7 @@ fn debug_round_trips_a_mutable_let_statement() {
         StmtKind::Let {
             mutable: true,
             name: Spanned::new("s".to_string(), Span::new(8, 9)),
+            ty: None,
             value: Expr::new(
                 ExprKind::Str("hi".to_string()),
                 info(&mut ids, Span::new(12, 16)),
@@ -45,7 +47,7 @@ fn debug_round_trips_a_mutable_let_statement() {
     );
     assert_eq!(
         format!("{stmt:?}"),
-        "Stmt { info: #1@0..17, kind: Let { mutable: true, name: \"s\"@8..9, value: Expr { info: #0@12..16, kind: Str(\"hi\") } } }"
+        "Stmt { info: #1@0..17, kind: Let { mutable: true, name: \"s\"@8..9, ty: None, value: Expr { info: #0@12..16, kind: Str(\"hi\") } } }"
     );
 }
 

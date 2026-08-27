@@ -2,6 +2,7 @@
 
 use crate::expr::{Block, Expr};
 use crate::node::{AstNode, HasSpan, Ident, NodeId, NodeInfo};
+use crate::ty::Type;
 use nex_lexer::Span;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -34,6 +35,8 @@ pub enum StmtKind {
     Let {
         mutable: bool,
         name: Ident,
+        /// `let x: i32 = 5;`, absent when the type is left to inference
+        ty: Option<Type>,
         value: Expr,
     },
     Return(Option<Expr>),

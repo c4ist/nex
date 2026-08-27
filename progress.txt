@@ -4,10 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 3.11
-current_phase = 4 (Parser: statements & items) - starting
-next_step = 4.1 (let / let mut with optional type annotation and required
-            initializer)
+last_step = 4.1
+current_phase = 4 (Parser: statements & items) - in progress
+next_step = 4.2 (assignment and compound assignment statements)
 
 Phase status
 ------------
@@ -15,6 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
+[~] Phase 4  Parser: statements & items   (4.1 done)
 [ ] Phase 4  Parser: statements & items
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
@@ -151,6 +151,11 @@ Design notes
   multi-byte char earlier in the line shifts the reported column right.
   Empty spans (the Eof token has one) are widened by a char, since
   ariadne panics on an empty range.
+- StmtKind::Let gained `ty: Option<Type>` in 4.1; the ast had no room for
+  the annotation before. parse_type covers named types with generic args,
+  [T], &T and fn(..) -> T.
+- `Vec<Vec<T>>` does not parse: `>>` lexes as one shift token so the inner
+  `>` closes nothing. Needs the lexer or parser to split it.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

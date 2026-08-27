@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 3.11
+- **last step:** 4.1
 - **current phase:** 4 (parser: statements and items)
-- **next step:** 4.1, `let` / `let mut` statements
+- **next step:** 4.2, assignment statements
 
 ## Phase status
 
@@ -22,7 +22,7 @@ one step per commit, no skipping ahead.
 | 1     | Lexer                              | done        |
 | 2     | AST design                         | done        |
 | 3     | Parser: expressions                | done        |
-| 4     | Parser: statements & items         | planned     |
+| 4     | Parser: statements & items         | in progress |
 | 5     | Tree-walking interpreter           | planned     |
 | 6     | Name resolution + type checker     | planned     |
 | 7     | Language feature wave 2            | planned     |

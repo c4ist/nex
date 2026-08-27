@@ -128,10 +128,16 @@ pub fn print_stmt(stmt: &Stmt) -> String {
         StmtKind::Let {
             mutable,
             name,
+            ty,
             value,
         } => {
             let head = if *mutable { "let-mut" } else { "let" };
-            sexp(head, &[ident_str(name), print_expr(value)])
+            let mut parts = vec![ident_str(name)];
+            if let Some(ty) = ty {
+                parts.push(print_type(ty));
+            }
+            parts.push(print_expr(value));
+            sexp(head, &parts)
         }
         StmtKind::Return(value) => match value {
             Some(e) => sexp("return", &[print_expr(e)]),

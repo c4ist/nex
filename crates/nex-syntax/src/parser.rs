@@ -8,6 +8,7 @@ use crate::module::Module;
 use crate::node::{NodeIdGen, NodeInfo, Spanned};
 use crate::pattern::{FieldPattern, Pattern, PatternKind};
 use crate::stmt::{Stmt, StmtKind};
+use crate::ty::{Type, TypeKind};
 use nex_lexer::{Span, Token, TokenKind};
 
 /// binds tighter than every infix operator, so `-a * b` is `(-a) * b`
@@ -645,8 +646,148 @@ impl<'a> Parser<'a> {
         self.leaf(ExprKind::StructLit { name, fields }, span)
     }
 
-    /// only expression statements for now; `let` and friends arrive with
-    /// statement parsing.
+    /// `let x = 1;`, `let mut x = 1;`, `let x: i32 = 1;`. the initializer is
+    /// required; the type annotation isn't.
+    fn parse_let(&mut self) -> Stmt {
+        let let_tok = self.expect(TokenKind::Let);
+
+        let mutable = self.peek().kind == TokenKind::Mut;
+        if mutable {
+            self.advance();
+        }
+
+        let name = self.expect_ident();
+
+        let ty = if self.peek().kind == TokenKind::Colon {
+            self.advance();
+            Some(self.parse_type())
+        } else {
+            None
+        };
+
+        let eq = self.expect(TokenKind::Eq);
+        // without the `=` there is no initializer to parse, and trying
+        // anyway would report a second error for the same mistake
+        let value = if eq.kind == TokenKind::Eq {
+            self.with_struct_literals(|p| p.parse_expr())
+        } else {
+            Expr::new(ExprKind::Unit, NodeInfo::dummy(eq.span))
+        };
+
+        let span = let_tok.span.merge(value.info.span);
+        Stmt::new(
+            StmtKind::Let {
+                mutable,
+                name,
+                ty,
+                value,
+            },
+            NodeInfo::new(self.ids.fresh(), span),
+        )
+    }
+
+    /// `i32`, `Option<T>`, `[T]`, `&T`, `fn(A, B) -> C`
+    fn parse_type(&mut self) -> Type {
+        let tok = self.peek().clone();
+        match tok.kind {
+            TokenKind::Amp => {
+                self.advance();
+                let inner = self.parse_type();
+                let span = tok.span.merge(inner.info.span);
+                self.ty(TypeKind::Ref(Box::new(inner)), span)
+            }
+            TokenKind::LBracket => {
+                self.advance();
+                let elem = self.parse_type();
+                let close = self.expect(TokenKind::RBracket);
+                let span = tok.span.merge(close.span);
+                self.ty(TypeKind::Array(Box::new(elem)), span)
+            }
+            TokenKind::Fn => {
+                self.advance();
+                self.expect(TokenKind::LParen);
+                let mut params = Vec::new();
+                loop {
+                    if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
+                        break;
+                    }
+                    params.push(self.parse_type());
+                    if self.peek().kind == TokenKind::Comma {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                let close = self.expect(TokenKind::RParen);
+                let mut span = tok.span.merge(close.span);
+                let return_type = if self.peek().kind == TokenKind::Arrow {
+                    self.advance();
+                    let ret = self.parse_type();
+                    span = span.merge(ret.info.span);
+                    Some(Box::new(ret))
+                } else {
+                    None
+                };
+                self.ty(
+                    TypeKind::Fn {
+                        params,
+                        return_type,
+                    },
+                    span,
+                )
+            }
+            TokenKind::Ident(_) => {
+                let name = self.expect_ident();
+                let mut span = name.span;
+                let mut args = Vec::new();
+                if self.peek().kind == TokenKind::Lt {
+                    self.advance();
+                    loop {
+                        if matches!(self.peek().kind, TokenKind::Gt | TokenKind::Eof) {
+                            break;
+                        }
+                        args.push(self.parse_type());
+                        if self.peek().kind == TokenKind::Comma {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    let close = self.expect(TokenKind::Gt);
+                    span = span.merge(close.span);
+                }
+                self.ty(TypeKind::Named { name, args }, span)
+            }
+            _ => {
+                self.advance();
+                self.errors.push(ParseError::new(
+                    format!("expected a type, found {}", tok.kind.describe()),
+                    tok.span,
+                ));
+                Type::new(
+                    TypeKind::Named {
+                        name: Spanned::new(String::new(), tok.span),
+                        args: Vec::new(),
+                    },
+                    NodeInfo::dummy(tok.span),
+                )
+            }
+        }
+    }
+
+    fn ty(&mut self, kind: TypeKind, span: Span) -> Type {
+        Type::new(kind, NodeInfo::new(self.ids.fresh(), span))
+    }
+
+    fn parse_stmt(&mut self) -> Stmt {
+        if self.peek().kind == TokenKind::Let {
+            return self.parse_let();
+        }
+        let expr = self.with_struct_literals(|p| p.parse_expr());
+        let span = expr.info.span;
+        Stmt::new(StmtKind::Expr(expr), NodeInfo::new(self.ids.fresh(), span))
+    }
+
     fn parse_block(&mut self) -> Block {
         let open = self.expect(TokenKind::LBrace);
         if open.kind != TokenKind::LBrace {
@@ -661,12 +802,7 @@ impl<'a> Parser<'a> {
             }
 
             let errors_before = self.errors.len();
-            let expr = self.with_struct_literals(|p| p.parse_expr());
-            let span = expr.info.span;
-            stmts.push(Stmt::new(
-                StmtKind::Expr(expr),
-                NodeInfo::new(self.ids.fresh(), span),
-            ));
+            stmts.push(self.parse_stmt());
 
             if self.errors.len() > errors_before {
                 self.synchronize();
