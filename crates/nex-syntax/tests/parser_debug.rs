@@ -1,5 +1,4 @@
-//! parser scaffolding tests: the token cursor and the empty-module case.
-//! real item/expression parsing arrives in later steps.
+//! the token cursor and the empty-module case.
 
 use nex_lexer::{Token, TokenKind};
 use nex_syntax::{parse_module, ParseError, Parser};
@@ -23,7 +22,7 @@ fn peek_never_runs_past_eof() {
     let tokens = eof_only();
     let mut parser = Parser::new(&tokens);
     assert!(parser.at_eof());
-    // advancing past Eof is a no-op; peek keeps returning it
+    // advancing past Eof is a no-op
     parser.advance();
     parser.advance();
     assert!(parser.at_eof());
@@ -44,7 +43,6 @@ fn advance_returns_each_token_in_order_and_stops_at_eof() {
     let second = parser.advance();
     assert!(matches!(second.kind, TokenKind::Ident(_)));
 
-    // both real tokens are consumed; the cursor now sits on Eof
     assert!(parser.at_eof());
     let third = parser.advance();
     assert_eq!(third.kind, TokenKind::Eof);
@@ -65,15 +63,13 @@ fn expect_records_an_error_on_a_mismatched_token_but_still_returns_it() {
     let (tokens, _) = nex_lexer::tokenize("fn");
     let mut parser = Parser::new(&tokens);
     let tok = parser.expect(TokenKind::Let);
-    // still the actual token at the cursor, not consumed as the wrong kind
     assert_eq!(tok.kind, TokenKind::Fn);
     assert_eq!(parser.errors().len(), 1);
     assert_eq!(parser.errors()[0].span, tok.span);
 }
 
-// item parsing isn't implemented yet (phase 4); a non-empty file reports
-// one "not implemented" error per leftover token instead of silently
-// dropping them, and consumes everything so it terminates.
+// until items are parsed, a non-empty file reports one error per leftover
+// token rather than dropping them silently
 #[test]
 fn parse_module_reports_every_leftover_token_for_non_empty_input() {
     let (tokens, lex_errors) = nex_lexer::tokenize("fn main() {}");
@@ -85,6 +81,6 @@ fn parse_module_reports_every_leftover_token_for_non_empty_input() {
     assert_eq!(errors.len(), non_eof_token_count);
     for err in &errors {
         let ParseError { message, .. } = err;
-        assert_eq!(message, "item parsing arrives in Phase 4");
+        assert_eq!(message, "item parsing is not implemented yet");
     }
 }

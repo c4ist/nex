@@ -220,7 +220,7 @@ impl AstNode for Enum {
     }
 }
 
-/// `use a::b::c;`. just the path for now; no `as` aliasing or `{}` groups yet
+/// `use a::b::c;` - no `as` aliasing or `{}` groups yet
 #[derive(Clone, Debug, PartialEq)]
 pub struct Use {
     pub info: NodeInfo,
@@ -271,8 +271,7 @@ impl AstNode for Mod {
     }
 }
 
-/// stub: just the target type's name, no method bodies yet. those need `Fn`
-/// items nested inside, which lands once impls are fleshed out for real.
+/// a stub: the target type only, no methods yet
 #[derive(Clone, Debug, PartialEq)]
 pub struct Impl {
     pub info: NodeInfo,

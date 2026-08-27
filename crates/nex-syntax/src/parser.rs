@@ -1,8 +1,7 @@
-//! the parser: a token cursor plus recoverable errors, with a pratt loop
-//! for expressions. item parsing lands in phase 4 - for now `parse_module`
-//! only really handles the empty-module case, and anything past `Eof`
-//! records a "not implemented yet" error and moves on, the same way
-//! `nex-driver`'s unfinished subcommands do.
+//! recursive-descent parser with a pratt loop for expressions.
+//!
+//! errors are collected rather than thrown: every parse returns a tree, and
+//! anything that went wrong is in `errors()`.
 
 use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
 use crate::module::Module;
@@ -11,24 +10,14 @@ use crate::pattern::{FieldPattern, Pattern, PatternKind};
 use crate::stmt::{Stmt, StmtKind};
 use nex_lexer::{Span, Token, TokenKind};
 
-/// binding power of the prefix operators (`-x`, `!x`). higher than every
-/// infix operator, so `-a * b` parses as `(-a) * b`.
+/// binds tighter than every infix operator, so `-a * b` is `(-a) * b`
 const PREFIX_BP: u8 = 19;
 
-/// binding power of `..` and `..=`, looser than every operator in
-/// `infix_binding_power` (whose lowest, `||`, is 1). ranges don't chain:
-/// parsing the end at `RANGE_BP + 1` means `a..b..c` stops after `a..b`.
+/// binds looser than every infix operator
 const RANGE_BP: u8 = 0;
 
-/// `(op, left_bp, right_bp)` for an infix operator, or `None` if the token
-/// doesn't start one. every operator here is left-associative, encoded as
-/// `right_bp == left_bp + 1`, so `a - b - c` parses as `(a - b) - c`.
-///
-/// the ladder runs lowest-to-highest: `||` binds loosest of the operators
-/// listed here, arithmetic tightest. ranges (`..`, `..=`) bind looser
-/// still and are handled separately in `parse_expr_bp`, since they build
-/// an `ExprKind::Range` rather than a `Binary`. postfix call/field/index
-/// bind tighter than any prefix operator; see `parse_postfix`.
+/// `(op, left_bp, right_bp)`, lowest precedence first. all left-associative,
+/// which is what `right_bp = left_bp + 1` encodes.
 fn infix_binding_power(kind: &TokenKind) -> Option<(BinaryOp, u8, u8)> {
     use TokenKind as T;
     let (op, bp) = match kind {
@@ -83,14 +72,8 @@ pub struct Parser<'a> {
     pos: usize,
     ids: NodeIdGen,
     errors: Vec<ParseError>,
-    /// set while parsing the condition of an `if`/`while`/`for`, where a
-    /// bare `Ident {` must read as "condition, then the body's opening
-    /// brace" rather than as a struct literal. `if x { }` would otherwise
-    /// parse `x { }` as a struct literal and then find no body.
-    ///
-    /// nothing sets this until `if` arrives in step 3.7; the flag and the
-    /// `with_struct_literals` escape hatch land here because struct
-    /// literals are what create the ambiguity in the first place.
+    /// `if x { }` has to read as a condition plus a body, not as the struct
+    /// literal `x { }`. set while parsing a condition or match scrutinee.
     no_struct_literal: bool,
 }
 
@@ -105,14 +88,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// the token at the cursor. the token stream is expected to end with
-    /// `Eof`; peek keeps returning it past the end rather than panicking.
     pub fn peek(&self) -> &Token {
         self.peek_nth(0)
     }
 
-    /// the token `n` positions past the cursor, clamped to the trailing
-    /// `Eof` so lookahead never runs off the end.
     fn peek_nth(&self, n: usize) -> &Token {
         self.tokens
             .get(self.pos + n)
@@ -120,33 +99,12 @@ impl<'a> Parser<'a> {
             .expect("token stream must contain at least Eof")
     }
 
-    /// runs `f` with struct literals disabled, then restores the previous
-    /// setting. saves-and-restores rather than clearing, so a nested
-    /// condition (`if a { }` inside another condition) still behaves.
-    fn without_struct_literals<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let saved = self.no_struct_literal;
-        self.no_struct_literal = true;
-        let out = f(self);
-        self.no_struct_literal = saved;
-        out
-    }
-
-    /// re-enables struct literals inside a nested delimiter, where the
-    /// `if cond {` ambiguity can't arise: `if f(P { x: 1 }) { }` is fine.
-    fn with_struct_literals<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let saved = self.no_struct_literal;
-        self.no_struct_literal = false;
-        let out = f(self);
-        self.no_struct_literal = saved;
-        out
-    }
-
     pub fn at_eof(&self) -> bool {
         self.peek().is_eof()
     }
 
-    /// consumes and returns the current token, then moves the cursor
-    /// forward - except at `Eof`, which never advances past itself.
+    /// note this is a no-op at `Eof`, so loops need their own `Eof` case or
+    /// they will spin.
     pub fn advance(&mut self) -> Token {
         let tok = self.peek().clone();
         if !tok.is_eof() {
@@ -155,9 +113,8 @@ impl<'a> Parser<'a> {
         tok
     }
 
-    /// consumes the current token if it matches `kind`; otherwise records a
-    /// `ParseError` and returns the (wrong) token anyway, so the caller can
-    /// keep going instead of aborting the whole parse.
+    /// consumes the token if it matches, otherwise records an error and
+    /// returns the token it found instead.
     pub fn expect(&mut self, kind: TokenKind) -> Token {
         let tok = self.peek().clone();
         if tok.kind == kind {
@@ -175,17 +132,44 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn expect_ident(&mut self) -> Spanned<String> {
+        let tok = self.peek().clone();
+        if let TokenKind::Ident(name) = tok.kind {
+            self.advance();
+            Spanned::new(name, tok.span)
+        } else {
+            self.errors.push(ParseError::new(
+                format!("expected identifier, found {}", tok.kind.describe()),
+                tok.span,
+            ));
+            Spanned::new(String::new(), tok.span)
+        }
+    }
+
     pub fn errors(&self) -> &[ParseError] {
         &self.errors
     }
 
-    /// after a failed statement, skip forward to the next plausible
-    /// statement boundary so one bad statement doesn't cascade into a
-    /// pile of errors about the tokens that followed it.
-    ///
-    /// `;` is consumed (it ends the broken statement); `}` is left in
-    /// place for the enclosing block to close on. stops at `Eof` either
-    /// way, so this always terminates.
+    fn without_struct_literals<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let saved = self.no_struct_literal;
+        self.no_struct_literal = true;
+        let out = f(self);
+        self.no_struct_literal = saved;
+        out
+    }
+
+    /// inside a delimiter the `if cond {` ambiguity is gone, so struct
+    /// literals are allowed again.
+    fn with_struct_literals<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let saved = self.no_struct_literal;
+        self.no_struct_literal = false;
+        let out = f(self);
+        self.no_struct_literal = saved;
+        out
+    }
+
+    /// skips to the next statement boundary after a bad statement, so one
+    /// mistake doesn't produce an error for every token after it.
     fn synchronize(&mut self) {
         loop {
             match self.peek().kind {
@@ -201,13 +185,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// parses a full expression, honouring operator precedence.
     pub fn parse_expr(&mut self) -> Expr {
         self.parse_expr_bp(0)
     }
 
-    /// the pratt loop: parse a prefix expression, then keep folding in
-    /// infix operators for as long as they bind tighter than `min_bp`.
     fn parse_expr_bp(&mut self, min_bp: u8) -> Expr {
         let mut lhs = self.parse_prefix();
 
@@ -228,11 +209,8 @@ impl<'a> Parser<'a> {
             );
         }
 
-        // ranges bind looser than every operator above, so they fold in
-        // last and only at the outermost level: `a + 1 .. b * 2` is one
-        // range between two arithmetic expressions, and `a .. b || c`
-        // means `a .. (b || c)`. parsing the end above RANGE_BP is what
-        // stops `a..b..c` from chaining.
+        // ranges are looser than everything above, so they fold in last.
+        // parsing the end above RANGE_BP stops `a..b..c` from chaining.
         if min_bp == RANGE_BP && matches!(self.peek().kind, TokenKind::DotDot | TokenKind::DotDotEq)
         {
             let op_tok = self.advance();
@@ -252,7 +230,6 @@ impl<'a> Parser<'a> {
         lhs
     }
 
-    /// a prefix operator applied to an operand, or a leaf.
     fn parse_prefix(&mut self) -> Expr {
         if let Some(op) = prefix_op(&self.peek().kind) {
             let op_tok = self.advance();
@@ -269,9 +246,7 @@ impl<'a> Parser<'a> {
         self.parse_postfix()
     }
 
-    /// a leaf followed by any number of postfix chains: `f(x)(y).z[0]`.
-    /// these bind tighter than the prefix operators, so `-a.b()` negates
-    /// the *result* of the call.
+    /// call, field access and indexing: `f(x)(y).z[0]`
     fn parse_postfix(&mut self) -> Expr {
         let mut expr = self.parse_leaf();
 
@@ -322,13 +297,9 @@ impl<'a> Parser<'a> {
         expr
     }
 
-    /// a comma-separated argument list, already past the `(` and stopping
-    /// before the `)`. a trailing comma is allowed.
     fn parse_call_args(&mut self) -> Vec<Expr> {
         let mut args = Vec::new();
         loop {
-            // `)` ends the list; Eof would otherwise spin, since neither
-            // `parse_expr` nor `expect` consumes anything there
             if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
                 break;
             }
@@ -342,24 +313,6 @@ impl<'a> Parser<'a> {
         args
     }
 
-    /// consumes an identifier, or reports one and yields a placeholder so
-    /// the caller can keep parsing.
-    fn expect_ident(&mut self) -> Spanned<String> {
-        let tok = self.peek().clone();
-        if let TokenKind::Ident(name) = tok.kind {
-            self.advance();
-            Spanned::new(name, tok.span)
-        } else {
-            self.errors.push(ParseError::new(
-                format!("expected identifier, found {}", tok.kind.describe()),
-                tok.span,
-            ));
-            Spanned::new(String::new(), tok.span)
-        }
-    }
-
-    /// a literal, an identifier, a struct literal, a parenthesized
-    /// expression, or a block.
     fn parse_leaf(&mut self) -> Expr {
         match self.peek().kind {
             TokenKind::LParen => return self.parse_paren(),
@@ -393,15 +346,13 @@ impl<'a> Parser<'a> {
                     format!("expected an expression, found {}", tok.kind.describe()),
                     tok.span,
                 ));
-                // NodeId::DUMMY marks this as synthesised during recovery,
-                // not a real `()` value the source wrote.
+                // the dummy id marks this as invented during recovery
                 Expr::new(ExprKind::Unit, NodeInfo::dummy(tok.span))
             }
         }
     }
 
-    /// `(expr)` - the parens only group, they leave no node of their own.
-    /// `()` is the unit literal.
+    /// parens only group; `()` is the unit literal
     fn parse_paren(&mut self) -> Expr {
         let open = self.expect(TokenKind::LParen);
 
@@ -412,20 +363,11 @@ impl<'a> Parser<'a> {
 
         let inner = self.with_struct_literals(|p| p.parse_expr());
         let close = self.expect(TokenKind::RParen);
-        // the grouped expression keeps its own node and NodeId; only its
-        // span widens to cover the parens, so diagnostics can point at the
-        // whole `( ... )` rather than just the inside
-        let span = open.span.merge(close.span);
-        self.leaf(inner.kind, span)
+        self.leaf(inner.kind, open.span.merge(close.span))
     }
 
-    /// `if cond { .. }`, `if cond { .. } else { .. }`, or an `else if`
-    /// chain. both arms are blocks; `else` is optional.
     fn parse_if(&mut self) -> Expr {
         let if_tok = self.expect(TokenKind::If);
-
-        // a bare `Ident {` in condition position is the condition followed
-        // by the body's brace, never a struct literal
         let cond = self.without_struct_literals(|p| p.parse_expr());
 
         let then = self.parse_block();
@@ -435,8 +377,7 @@ impl<'a> Parser<'a> {
         let mut span = if_tok.span.merge(then_span);
         let else_ = if self.peek().kind == TokenKind::Else {
             self.advance();
-            // `else if` chains by nesting another if-expression in the
-            // else arm rather than by a dedicated node
+            // `else if` just nests another if in the else arm
             let branch = if self.peek().kind == TokenKind::If {
                 self.parse_if()
             } else {
@@ -460,10 +401,8 @@ impl<'a> Parser<'a> {
         )
     }
 
-    /// `match scrutinee { pat => expr, pat => expr }`.
     fn parse_match(&mut self) -> Expr {
         let match_tok = self.expect(TokenKind::Match);
-        // same ambiguity as an `if` condition: `match x { .. }`
         let scrutinee = self.without_struct_literals(|p| p.parse_expr());
 
         let open = self.expect(TokenKind::LBrace);
@@ -512,8 +451,6 @@ impl<'a> Parser<'a> {
         )
     }
 
-    /// a match pattern: `_`, a binding, a literal, `Enum::Variant(..)`,
-    /// `Struct { .. }`, or a tuple.
     fn parse_pattern(&mut self) -> Pattern {
         let tok = self.peek().clone();
         match tok.kind {
@@ -538,9 +475,7 @@ impl<'a> Parser<'a> {
                 self.advance();
                 self.pattern(PatternKind::Bool(false), tok.span)
             }
-            // negative number literals: `-1 => ..`. the minus is part of
-            // the literal here, not a unary operator - patterns aren't
-            // expressions and there is nothing to negate at runtime.
+            // in a pattern the minus is part of the literal, not an operator
             TokenKind::Minus => {
                 self.advance();
                 let lit = self.peek().clone();
@@ -578,7 +513,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// `(a, b)` - a tuple pattern. a trailing comma is allowed.
     fn parse_tuple_pattern(&mut self) -> Pattern {
         let open = self.expect(TokenKind::LParen);
         let mut elems = Vec::new();
@@ -597,18 +531,16 @@ impl<'a> Parser<'a> {
         self.pattern(PatternKind::Tuple(elems), open.span.merge(close.span))
     }
 
-    /// an identifier-led pattern: `_`, a binding, `Enum::Variant(..)`, or
-    /// `Struct { .. }`. which one it is depends on what follows the name.
+    /// a binding, `_`, `Enum::Variant(..)` or `Struct { .. }`, decided by
+    /// what follows the name.
     fn parse_ident_pattern(&mut self) -> Pattern {
         let first = self.expect_ident();
 
-        // `_` lexes as an ordinary identifier, so the wildcard is spelled
-        // rather than tokenised
+        // `_` is an ordinary identifier as far as the lexer is concerned
         if first.value == "_" {
             return self.pattern(PatternKind::Wildcard, first.span);
         }
 
-        // `Enum::Variant` - collect the whole `::` path first
         let mut path = vec![first];
         while self.peek().kind == TokenKind::ColonColon {
             self.advance();
@@ -616,7 +548,6 @@ impl<'a> Parser<'a> {
         }
 
         match self.peek().kind {
-            // `Variant(a, b)` - payload patterns
             TokenKind::LParen => {
                 self.advance();
                 let mut fields = Vec::new();
@@ -635,9 +566,6 @@ impl<'a> Parser<'a> {
                 let span = path[0].span.merge(close.span);
                 self.pattern(PatternKind::EnumVariant { path, fields }, span)
             }
-            // `Point { x: px }` - struct pattern. only single-segment
-            // names take this form today, matching the struct literal
-            // syntax on the expression side.
             TokenKind::LBrace if path.len() == 1 => {
                 self.advance();
                 let mut fields = Vec::new();
@@ -665,8 +593,7 @@ impl<'a> Parser<'a> {
                 let span = name.span.merge(close.span);
                 self.pattern(PatternKind::Struct { name, fields }, span)
             }
-            // a multi-segment path with no payload is a unit variant
-            // (`Option::None`); a bare name binds
+            // a bare name binds; a longer path is a unit variant
             _ => {
                 if path.len() == 1 {
                     let name = path.remove(0);
@@ -686,28 +613,18 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn pattern(&mut self, kind: PatternKind, span: Span) -> Pattern {
-        Pattern::new(kind, NodeInfo::new(self.ids.fresh(), span))
-    }
-
-    /// `Point { x: 1.0, y: 2.0 }`. only reached when struct literals are
-    /// permitted here; see `no_struct_literal`.
     fn parse_struct_literal(&mut self) -> Expr {
         let name = self.expect_ident();
         self.expect(TokenKind::LBrace);
         let mut fields = Vec::new();
 
         loop {
-            // `}` ends the list; Eof would otherwise spin, since nothing
-            // below consumes a token there
             if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
                 break;
             }
 
             let field_name = self.expect_ident();
             self.expect(TokenKind::Colon);
-            // inside the braces the ambiguity is gone, so a nested struct
-            // literal is allowed even in an `if` condition
             let value = self.with_struct_literals(|p| p.parse_expr());
             let span = field_name.span.merge(value.info.span);
             fields.push(FieldInit::new(
@@ -728,28 +645,19 @@ impl<'a> Parser<'a> {
         self.leaf(ExprKind::StructLit { name, fields }, span)
     }
 
-    /// `{ a; b; c }` - a braced sequence of statements. only expression
-    /// statements exist so far; `let`/`return`/loops arrive in phase 4.
+    /// only expression statements for now; `let` and friends arrive with
+    /// statement parsing.
     fn parse_block(&mut self) -> Block {
         let open = self.expect(TokenKind::LBrace);
         if open.kind != TokenKind::LBrace {
-            // there is no block here at all. returning early keeps one
-            // real problem to one diagnostic - carrying on would also
-            // report a missing `}` for a brace the source never opened.
+            // no block here at all, so don't also complain about a missing `}`
             return Block::new(Vec::new(), NodeInfo::dummy(open.span));
         }
         let mut stmts = Vec::new();
 
         loop {
-            match self.peek().kind {
-                TokenKind::RBrace => break,
-                // an unterminated block would otherwise spin forever here:
-                // `advance` is a no-op at Eof, so `parse_expr` would keep
-                // returning a dummy without consuming anything. bail out
-                // through `expect` so the message matches the one a
-                // half-parsed block (`{ a; b`) produces below.
-                TokenKind::Eof => break,
-                _ => {}
+            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
+                break;
             }
 
             let errors_before = self.errors.len();
@@ -760,16 +668,11 @@ impl<'a> Parser<'a> {
                 NodeInfo::new(self.ids.fresh(), span),
             ));
 
-            // this statement didn't parse cleanly: skip to the next
-            // boundary and keep going, so the block reports every broken
-            // statement rather than only the first
             if self.errors.len() > errors_before {
                 self.synchronize();
                 continue;
             }
 
-            // a trailing `;` is optional before `}`; the block's value is
-            // its last expression statement either way
             if self.peek().kind == TokenKind::Semi {
                 self.advance();
             } else {
@@ -786,13 +689,19 @@ impl<'a> Parser<'a> {
         Expr::new(kind, NodeInfo::new(self.ids.fresh(), span))
     }
 
-    /// parses a whole source file into a `Module`.
+    fn pattern(&mut self, kind: PatternKind, span: Span) -> Pattern {
+        Pattern::new(kind, NodeInfo::new(self.ids.fresh(), span))
+    }
+
+    /// items aren't parsed yet, so this only really handles an empty file
     pub fn parse_module(&mut self) -> Module {
         let items = Vec::new();
         while !self.at_eof() {
             let tok = self.peek().clone();
-            self.errors
-                .push(ParseError::new("item parsing arrives in Phase 4", tok.span));
+            self.errors.push(ParseError::new(
+                "item parsing is not implemented yet",
+                tok.span,
+            ));
             self.advance();
         }
         let span = self.peek().span;
@@ -800,16 +709,12 @@ impl<'a> Parser<'a> {
     }
 }
 
-/// tokenize-and-parse convenience wrapper.
 pub fn parse_module(tokens: &[Token]) -> (Module, Vec<ParseError>) {
     let mut parser = Parser::new(tokens);
     let module = parser.parse_module();
     (module, parser.errors)
 }
 
-/// parses a single leaf expression (literal or identifier) from a token
-/// stream. mainly useful for tests until step 3.3+ gives `Parser` a real
-/// top-level expression entry point.
 pub fn parse_expr(tokens: &[Token]) -> (Expr, Vec<ParseError>) {
     let mut parser = Parser::new(tokens);
     let expr = parser.parse_expr();

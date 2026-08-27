@@ -1,5 +1,4 @@
-//! parsing expressions: leaves (step 3.2) and the pratt operator ladder
-//! (step 3.3).
+//! expression parsing.
 
 use nex_syntax::{parse_expr, print_expr};
 
@@ -60,7 +59,6 @@ fn parses_an_identifier() {
     assert_eq!(errors, Vec::<String>::new());
 }
 
-// not a valid expression start; recovers to a dummy unit node plus one error
 #[test]
 fn reports_an_error_on_a_non_expression_token() {
     let (printed, errors) = parse("+");
@@ -75,9 +73,7 @@ fn reports_an_error_at_end_of_file() {
     assert_eq!(errors, vec!["expected an expression, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.3: operator precedence and associativity
-// ---------------------------------------------------------------------
+// operator precedence and associativity
 
 #[test]
 fn multiplication_binds_tighter_than_addition() {
@@ -101,8 +97,6 @@ fn arithmetic_operators_are_left_associative() {
 fn prefix_operators_bind_tighter_than_any_infix() {
     assert_eq!(sexp("-a * b"), "(* (- a) b)");
     assert_eq!(sexp("!a && b"), "(&& (! a) b)");
-    // ...but the operand of a prefix op is itself only a prefix expression,
-    // so the infix operator still wins the wider expression
     assert_eq!(sexp("-a + -b"), "(+ (- a) (- b))");
 }
 
@@ -121,15 +115,13 @@ fn comparison_binds_looser_than_arithmetic() {
 
 #[test]
 fn bitwise_ladder_orders_or_xor_and_shift() {
-    // | looser than ^ looser than & looser than << looser than +
     assert_eq!(sexp("a | b ^ c"), "(| a (^ b c))");
     assert_eq!(sexp("a ^ b & c"), "(^ a (& b c))");
     assert_eq!(sexp("a & b << c"), "(& a (<< b c))");
     assert_eq!(sexp("a << b + c"), "(<< a (+ b c))");
 }
 
-// one expression exercising every level of the ladder at once, loosest to
-// tightest: || && == | ^ & << + *
+// every level of the ladder at once
 #[test]
 fn the_full_precedence_ladder_nests_correctly() {
     assert_eq!(
@@ -138,9 +130,7 @@ fn the_full_precedence_ladder_nests_correctly() {
     );
 }
 
-// comparisons are left-associative here rather than non-associative as in
-// rust; `a < b == c` parses instead of erroring. revisit if the type
-// checker makes chained comparisons confusing rather than merely useless.
+// left-associative, unlike rust where this is an error
 #[test]
 fn comparisons_chain_left_associatively() {
     assert_eq!(sexp("a < b == c"), "(== (< a b) c)");
@@ -153,9 +143,7 @@ fn a_missing_right_operand_reports_one_error() {
     assert_eq!(errors, vec!["expected an expression, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.4: parentheses and blocks-as-expressions
-// ---------------------------------------------------------------------
+// parentheses and blocks-as-expressions
 
 #[test]
 fn parentheses_override_precedence() {
@@ -166,7 +154,6 @@ fn parentheses_override_precedence() {
 
 #[test]
 fn redundant_parentheses_leave_no_trace() {
-    // parens group, they don't produce a node of their own
     assert_eq!(sexp("((a))"), "a");
     assert_eq!(sexp("(a + b)"), "(+ a b)");
 }
@@ -185,7 +172,6 @@ fn parses_an_empty_block() {
 fn parses_a_block_of_expression_statements() {
     assert_eq!(sexp("{ a }"), "(block a)");
     assert_eq!(sexp("{ a; b }"), "(block a b)");
-    // a trailing semicolon is allowed
     assert_eq!(sexp("{ a; b; }"), "(block a b)");
 }
 
@@ -201,8 +187,7 @@ fn an_unclosed_paren_reports_an_error_without_hanging() {
     assert_eq!(errors, vec!["expected `)`, found end of file"]);
 }
 
-// regression: `advance` is a no-op at Eof, so an unterminated block must
-// break out explicitly or the statement loop spins forever
+// advance is a no-op at Eof, so the statement loop needs its own Eof case
 #[test]
 fn an_unclosed_block_reports_an_error_without_hanging() {
     let (printed, errors) = parse("{ a; b");
@@ -217,16 +202,13 @@ fn an_unclosed_empty_block_reports_an_error_without_hanging() {
     assert_eq!(errors, vec!["expected `}`, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.5: call, field-access and index postfix chains
-// ---------------------------------------------------------------------
+// call, field-access and index postfix chains
 
 #[test]
 fn parses_calls_with_various_arities() {
     assert_eq!(sexp("f()"), "(call f)");
     assert_eq!(sexp("f(a)"), "(call f a)");
     assert_eq!(sexp("f(a, b)"), "(call f a b)");
-    // a trailing comma is allowed
     assert_eq!(sexp("f(a, b,)"), "(call f a b)");
 }
 
@@ -238,7 +220,6 @@ fn parses_field_access_and_indexing() {
     assert_eq!(sexp("a[0][1]"), "(index (index a 0) 1)");
 }
 
-// the plan's worked example for this step
 #[test]
 fn parses_a_mixed_postfix_chain() {
     assert_eq!(
@@ -247,8 +228,6 @@ fn parses_a_mixed_postfix_chain() {
     );
 }
 
-// postfix binds tighter than prefix, so the negation applies to the call's
-// result rather than to `a`
 #[test]
 fn postfix_binds_tighter_than_prefix() {
     assert_eq!(sexp("-a.b()"), "(- (call (field a b)))");
@@ -281,15 +260,11 @@ fn unclosed_postfix_brackets_report_errors_without_hanging() {
     let (_, errors) = parse("a[0");
     assert_eq!(errors, vec!["expected `]`, found end of file"]);
 
-    // an unterminated argument list must not spin: at Eof neither
-    // parse_expr nor expect consumes anything
     let (_, errors) = parse("f(a,");
     assert_eq!(errors, vec!["expected `)`, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.6: struct literals
-// ---------------------------------------------------------------------
+// struct literals
 
 #[test]
 fn parses_a_struct_literal() {
@@ -336,9 +311,7 @@ fn an_unclosed_struct_literal_reports_an_error_without_hanging() {
     assert_eq!(errors, vec!["expected `}`, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.7: if/else as expressions
-// ---------------------------------------------------------------------
+// if/else as expressions
 
 #[test]
 fn parses_an_if_without_an_else() {
@@ -350,8 +323,7 @@ fn parses_an_if_else() {
     assert_eq!(sexp("if a { b } else { c }"), "(if a (block b) (block c))");
 }
 
-// `else if` nests another if-expression in the else arm rather than
-// introducing a dedicated chain node
+// `else if` just nests another if in the else arm
 #[test]
 fn parses_an_else_if_chain() {
     assert_eq!(
@@ -366,14 +338,13 @@ fn if_conditions_are_full_expressions() {
     assert_eq!(sexp("if f(a) { b }"), "(if (call f a) (block b))");
 }
 
-// the reason the no_struct_literal flag exists: `if x { }` must be a
-// condition plus a body, not a struct literal `x { }` with no body
+// `if x { }` is a condition plus a body, not the struct literal `x { }`
 #[test]
 fn a_bare_ident_condition_is_not_a_struct_literal() {
     assert_eq!(sexp("if x { y }"), "(if x (block y))");
 }
 
-// ...but inside a delimiter the ambiguity is gone, so struct literals work
+// inside a delimiter the ambiguity is gone
 #[test]
 fn struct_literals_still_parse_inside_a_condition_delimiter() {
     assert_eq!(
@@ -386,8 +357,7 @@ fn struct_literals_still_parse_inside_a_condition_delimiter() {
     );
 }
 
-// and the restriction is scoped to the condition only - the body is a
-// normal block again
+// the restriction covers the condition only
 #[test]
 fn struct_literals_parse_again_inside_the_if_body() {
     assert_eq!(
@@ -407,9 +377,7 @@ fn an_if_missing_its_body_reports_an_error() {
     assert_eq!(errors, vec!["expected `{`, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.8: match expressions with all phase-2.6 patterns
-// ---------------------------------------------------------------------
+// match expressions with all phase-2.6 patterns
 
 #[test]
 fn parses_a_match_with_wildcard_and_binding_patterns() {
@@ -425,7 +393,7 @@ fn parses_literal_patterns() {
     );
 }
 
-// the minus belongs to the literal - a pattern has nothing to negate
+// the minus belongs to the literal
 #[test]
 fn parses_negative_number_patterns() {
     assert_eq!(sexp("match x { -1 => a }"), "(match x (-1 a))");
@@ -438,7 +406,6 @@ fn parses_enum_variant_patterns() {
         sexp("match x { Option::Some(v) => v, Option::None => z }"),
         "(match x ((Option::Some v) v) (Option::None z))"
     );
-    // a single-segment name with a payload is still a variant
     assert_eq!(sexp("match x { Some(v) => v }"), "(match x ((Some v) v))");
 }
 
@@ -468,9 +435,6 @@ fn match_arms_allow_a_trailing_comma() {
     assert_eq!(sexp("match x { _ => a, }"), "(match x (_ a))");
 }
 
-// `::` paths work in *patterns* but not yet in expressions, so the arms of
-// the spec's sample match parse while its scrutinee does not. see
-// docs/.../internals/ast-coverage.md - ExprKind has no path variant.
 #[test]
 fn match_arms_accept_the_spec_sample_patterns() {
     assert_eq!(
@@ -479,8 +443,8 @@ fn match_arms_accept_the_spec_sample_patterns() {
     );
 }
 
-// known gap: a `::`-qualified *expression* has no ExprKind to parse into,
-// so the spec's `match Option::Some(x) { .. }` scrutinee is rejected.
+// known gap: ExprKind has no path variant, so `Option::Some(x)` only works
+// as a pattern, not as an expression
 #[test]
 fn a_path_qualified_scrutinee_is_not_supported_yet() {
     let (_, errors) = parse("match Option::Some(x) { _ => a }");
@@ -504,9 +468,7 @@ fn an_unclosed_match_reports_an_error_without_hanging() {
     assert_eq!(errors, vec!["expected `}`, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.9: range expressions
-// ---------------------------------------------------------------------
+// range expressions
 
 #[test]
 fn parses_exclusive_and_inclusive_ranges() {
@@ -515,13 +477,11 @@ fn parses_exclusive_and_inclusive_ranges() {
     assert_eq!(sexp("a..b"), "(range a b)");
 }
 
-// `0..10` must lex as Int DotDot Int, not as two floats
 #[test]
 fn a_range_between_integers_is_not_a_float() {
     assert_eq!(sexp("0..10"), "(range 0 10)");
 }
 
-// ranges bind looser than every other operator
 #[test]
 fn ranges_bind_looser_than_arithmetic_and_logic() {
     assert_eq!(sexp("a + 1..b * 2"), "(range (+ a 1) (* b 2))");
@@ -539,29 +499,21 @@ fn ranges_appear_inside_calls_and_indexes() {
     assert_eq!(sexp("a[0..n]"), "(index a (range 0 n))");
 }
 
-// ranges don't chain: parsing the end above RANGE_BP stops the second
-// `..`, so `a..b..c` yields `a..b` and leaves `..c` unconsumed rather
-// than nesting. (nothing rejects the leftovers yet - a trailing-token
-// check belongs to whole-file parsing in phase 4.)
+// `a..b..c` yields `a..b` and leaves `..c` unconsumed
 #[test]
 fn ranges_do_not_chain() {
     assert_eq!(sexp("a..b..c"), "(range a b)");
 }
 
-// known gap: ExprKind::Range requires both endpoints, so the open-ended
-// forms rust spells `a..`, `..b` and `..` have nowhere to go in the AST
+// known gap: Range needs both endpoints, so `a..` and `..b` can't be built
 #[test]
 fn open_ended_ranges_are_not_supported_yet() {
     let (_, errors) = parse("a..");
     assert_eq!(errors, vec!["expected an expression, found end of file"]);
 }
 
-// ---------------------------------------------------------------------
-// step 3.10: error recovery
-// ---------------------------------------------------------------------
+// error recovery
 
-// the plan's criterion for this step: three deliberate errors, all three
-// reported in one pass
 #[test]
 fn three_broken_statements_report_three_errors() {
     let (_, errors) = parse("{ else; else; else }");
@@ -575,15 +527,12 @@ fn three_broken_statements_report_three_errors() {
     );
 }
 
-// recovery skips to the next `;`, so the junk after a bad statement
-// doesn't produce a second error of its own
 #[test]
 fn recovery_skips_the_rest_of_a_broken_statement() {
     let (_, errors) = parse("{ else a b c; d }");
     assert_eq!(errors, vec!["expected an expression, found `else`"]);
 }
 
-// a good statement after a bad one still parses
 #[test]
 fn parsing_continues_after_a_recovered_error() {
     let (printed, errors) = parse("{ else; a + b }");
@@ -591,14 +540,12 @@ fn parsing_continues_after_a_recovered_error() {
     assert!(printed.contains("(+ a b)"), "{printed}");
 }
 
-// `}` is left for the block to close on rather than being swallowed
 #[test]
 fn recovery_stops_at_the_closing_brace() {
     let (_, errors) = parse("{ else }");
     assert_eq!(errors, vec!["expected an expression, found `else`"]);
 }
 
-// recovery must not spin at Eof, where advance() is a no-op
 #[test]
 fn recovery_terminates_at_end_of_file() {
     let (_, errors) = parse("{ else");

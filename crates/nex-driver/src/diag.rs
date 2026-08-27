@@ -1,9 +1,4 @@
-//! source-annotated diagnostic rendering, backed by `ariadne`.
-//!
-//! the hand-rolled renderer this replaced (steps 1.11a-3.10) kept the crate
-//! dependency-free while only the lexer produced errors. now that the parser
-//! reports spans too, `ariadne` handles the labels, gutters and multi-line
-//! spans instead.
+//! source-annotated diagnostics, rendered with `ariadne`.
 
 use ariadne::{Config, Label, Report, ReportKind, Source};
 use nex_lexer::Span;
@@ -14,10 +9,8 @@ pub struct Diagnostic {
     pub help: Option<String>,
 }
 
-/// renders every diagnostic against `src`, one report each.
-///
-/// colour is off: the output is compared in tests and piped to files at
-/// least as often as it is read on a terminal.
+/// one report per diagnostic. colour is off so the output is stable when
+/// piped or compared in tests.
 pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
     let mut out = String::new();
     for diagnostic in diagnostics {
@@ -26,13 +19,8 @@ pub fn render(path: &str, src: &str, diagnostics: &[Diagnostic]) -> String {
     out
 }
 
-/// nex spans are byte offsets; `ariadne`'s `Source` indexes by character.
-/// they only coincide for ascii, so a multi-byte character earlier in the
-/// line would otherwise push the reported column to the right.
-///
-/// a byte offset that isn't on a character boundary is rounded down rather
-/// than panicking - spans should always land on one, but a renderer is the
-/// wrong place to enforce that.
+/// our spans are byte offsets but ariadne counts characters, so a multi-byte
+/// char earlier in the line would shift the reported column.
 fn char_offset(src: &str, byte: usize) -> usize {
     let mut byte = byte.min(src.len());
     while byte > 0 && !src.is_char_boundary(byte) {
@@ -43,8 +31,7 @@ fn char_offset(src: &str, byte: usize) -> usize {
 
 fn render_one(path: &str, src: &str, diagnostic: &Diagnostic) -> String {
     let start = char_offset(src, diagnostic.span.start as usize);
-    // `ariadne` panics on an empty or reversed range, and the `Eof` token's
-    // span is empty by construction, so widen it to one character.
+    // ariadne rejects an empty range, and the Eof token's span is empty
     let end = char_offset(src, diagnostic.span.end as usize).max(start + 1);
     let span = (path, start..end);
 
@@ -58,8 +45,6 @@ fn render_one(path: &str, src: &str, diagnostic: &Diagnostic) -> String {
     }
 
     let mut buf = Vec::new();
-    // writing into a Vec cannot fail, and a diagnostic is the wrong place
-    // to surface an io error anyway
     let _ = report.finish().write((path, Source::from(src)), &mut buf);
     String::from_utf8_lossy(&buf).into_owned()
 }
@@ -100,8 +85,6 @@ mod tests {
         assert!(output.contains("test.nex:2:9"), "{output}");
     }
 
-    // multi-byte characters must not shift the reported column, and must
-    // not panic the renderer
     #[test]
     fn render_handles_multibyte_characters() {
         let src = "let café = @\n";
@@ -110,8 +93,6 @@ mod tests {
         assert!(output.contains("test.nex:1:12"), "{output}");
     }
 
-    // the Eof token's span is empty; ariadne rejects an empty range, so
-    // render widens it rather than panicking
     #[test]
     fn render_survives_an_empty_span() {
         let src = "let x =";
