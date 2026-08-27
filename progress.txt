@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.1
+last_step = 4.2
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.2 (assignment and compound assignment statements)
+next_step = 4.3 (return, break, continue, expression statements)
 
 Phase status
 ------------
@@ -14,8 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1 done)
-[ ] Phase 4  Parser: statements & items
+[~] Phase 4  Parser: statements & items   (4.1-4.2 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -36,7 +35,7 @@ Pending / deferred
   found real AST gaps beyond the already-tracked ones above: no path-qualified
   EXPRESSION (`Option::Some` can't be written as an Expr - the spec's own
   match sample can't be represented yet), no assignment/compound-assignment
-  statement (deferred to parser step 4.2 on purpose), no `const` item, no
+  statement (added in 4.2), no `const` item, no
   `type` alias item, no TypeKind::Unit for the `()` type. See the doc for
   the full list and reasoning.
 
@@ -156,6 +155,12 @@ Design notes
   [T], &T and fn(..) -> T.
 - `Vec<Vec<T>>` does not parse: `>>` lexes as one shift token so the inner
   `>` closes nothing. Needs the lexer or parser to split it.
+- StmtKind::Assign (4.2) holds an Expr target rather than a name, so
+  `a.b[0] = 1` parses; whether the target is actually assignable is left
+  to the type checker. `op: Option<BinaryOp>` is None for a plain `=`.
+  parse_stmt parses an expression first and only then looks for an
+  assignment operator, since the two start out identical. Assignment is a
+  statement, not an expression, so `x = y = 1` does not chain.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

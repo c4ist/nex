@@ -45,6 +45,19 @@ fn infix_binding_power(kind: &TokenKind) -> Option<(BinaryOp, u8, u8)> {
     Some((op, bp, bp + 1))
 }
 
+/// `Some(None)` for a plain `=`, `Some(Some(op))` for a compound assignment,
+/// `None` when the token isn't an assignment at all.
+fn assign_op(kind: &TokenKind) -> Option<Option<BinaryOp>> {
+    match kind {
+        TokenKind::Eq => Some(None),
+        TokenKind::PlusEq => Some(Some(BinaryOp::Add)),
+        TokenKind::MinusEq => Some(Some(BinaryOp::Sub)),
+        TokenKind::StarEq => Some(Some(BinaryOp::Mul)),
+        TokenKind::SlashEq => Some(Some(BinaryOp::Div)),
+        _ => None,
+    }
+}
+
 fn prefix_op(kind: &TokenKind) -> Option<UnaryOp> {
     match kind {
         TokenKind::Minus => Some(UnaryOp::Neg),
@@ -783,7 +796,25 @@ impl<'a> Parser<'a> {
         if self.peek().kind == TokenKind::Let {
             return self.parse_let();
         }
+
+        // an assignment starts out looking like an expression, so parse one
+        // and decide afterwards based on what follows it
         let expr = self.with_struct_literals(|p| p.parse_expr());
+
+        if let Some(op) = assign_op(&self.peek().kind) {
+            self.advance();
+            let value = self.with_struct_literals(|p| p.parse_expr());
+            let span = expr.info.span.merge(value.info.span);
+            return Stmt::new(
+                StmtKind::Assign {
+                    target: expr,
+                    op,
+                    value,
+                },
+                NodeInfo::new(self.ids.fresh(), span),
+            );
+        }
+
         let span = expr.info.span;
         Stmt::new(StmtKind::Expr(expr), NodeInfo::new(self.ids.fresh(), span))
     }

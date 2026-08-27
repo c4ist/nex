@@ -139,6 +139,13 @@ pub fn print_stmt(stmt: &Stmt) -> String {
             parts.push(print_expr(value));
             sexp(head, &parts)
         }
+        StmtKind::Assign { target, op, value } => {
+            let head = match op {
+                Some(op) => format!("{}=", binary_op_str(*op)),
+                None => "=".to_string(),
+            };
+            sexp(&head, &[print_expr(target), print_expr(value)])
+        }
         StmtKind::Return(value) => match value {
             Some(e) => sexp("return", &[print_expr(e)]),
             None => "(return)".to_string(),

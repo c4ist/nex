@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 4.1
+- **last step:** 4.2
 - **current phase:** 4 (parser: statements and items)
-- **next step:** 4.2, assignment statements
+- **next step:** 4.3, `return`, `break` and `continue`
 
 ## Phase status
 

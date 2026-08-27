@@ -102,3 +102,52 @@ fn nested_generics_do_not_parse_yet() {
     let (_, errors) = parse("let a: Vec<Vec<T>> = x;");
     assert!(!errors.is_empty(), "expected `Vec<Vec<T>>` to fail for now");
 }
+
+// assignment
+
+#[test]
+fn parses_a_plain_assignment() {
+    assert_eq!(sexp("x = 5;"), "(block (= x 5))");
+}
+
+#[test]
+fn parses_compound_assignments() {
+    assert_eq!(sexp("x += 1;"), "(block (+= x 1))");
+    assert_eq!(sexp("x -= 1;"), "(block (-= x 1))");
+    assert_eq!(sexp("x *= 2;"), "(block (*= x 2))");
+    assert_eq!(sexp("x /= 2;"), "(block (/= x 2))");
+}
+
+#[test]
+fn assignment_targets_may_be_places() {
+    assert_eq!(sexp("a.b = 1;"), "(block (= (field a b) 1))");
+    assert_eq!(sexp("a[0] = 1;"), "(block (= (index a 0) 1))");
+    assert_eq!(
+        sexp("a.b[0].c = 1;"),
+        "(block (= (field (index (field a b) 0) c) 1))"
+    );
+}
+
+#[test]
+fn an_assigned_value_is_a_full_expression() {
+    assert_eq!(sexp("x = a + b * c;"), "(block (= x (+ a (* b c))))");
+    assert_eq!(sexp("x += f(1);"), "(block (+= x (call f 1)))");
+}
+
+#[test]
+fn assignments_mix_with_other_statements() {
+    assert_eq!(sexp("let x = 1; x += 2; x"), "(block (let x 1) (+= x 2) x)");
+}
+
+// assignment is a statement, not an expression, so it can't nest
+#[test]
+fn assignment_does_not_chain() {
+    let (_, errors) = parse("x = y = 1;");
+    assert!(!errors.is_empty(), "expected `x = y = 1` to be rejected");
+}
+
+#[test]
+fn an_assignment_without_a_value_reports_an_error() {
+    let (_, errors) = parse("x = ;");
+    assert_eq!(errors, vec!["expected an expression, found `;`"]);
+}
