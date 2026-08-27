@@ -160,3 +160,15 @@ Known test gaps
 ---------------
 - No block comments yet (step 7.1), so `/* */` lexes as operators.
 - Character literals ('a') are not in the language.
+
+Lint enforcement
+----------------
+- clippy::cognitive_complexity is now wired in: `[workspace.lints.clippy]`
+  in the root Cargo.toml sets it to "warn", each crate opts in via
+  `[lints] workspace = true`, and the threshold lives in clippy.toml
+  (cognitive-complexity-threshold = 20). It composes with CI's existing
+  `cargo clippy -- -D warnings` rather than needing a separate command.
+  Verified both ways: the real threshold (20) passes clean with real
+  headroom (worst offenders today sit at 16 and 19), and dropping it to 1
+  makes the exact same CI command fail (29 violations, exit 101) -
+  confirming the lint is actually wired in, not just quietly allowed.

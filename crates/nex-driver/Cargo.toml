@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Command line driver for the Nex programming language"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "nex"
 path = "src/main.rs"

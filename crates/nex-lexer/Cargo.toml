@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Lexical analyzer for the Nex programming language"
 
+[lints]
+workspace = true
+
 [dependencies]
 
 [dev-dependencies]

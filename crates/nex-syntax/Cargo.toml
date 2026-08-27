@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Abstract syntax tree and parser for the Nex programming language"
 
+[lints]
+workspace = true
+
 [dependencies]
 nex-lexer.workspace = true
 

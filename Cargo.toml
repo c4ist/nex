@@ -24,6 +24,12 @@ insta = "=1.41.1"
 # hand-rolled renderer that stood in until the parser needed richer output.
 ariadne = "=0.5.1"
 
+[workspace.lints.clippy]
+# threshold is in clippy.toml (cognitive-complexity-threshold = 20). warn
+# here, not deny, so it composes with the `-D warnings` CI already runs
+# rather than doubling up on the fail behavior in two places.
+cognitive_complexity = "warn"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
