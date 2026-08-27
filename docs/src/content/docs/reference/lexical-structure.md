@@ -17,7 +17,7 @@ token stream always ends with exactly one `Eof` token.
 
 - **Whitespace** (any Unicode whitespace) is skipped.
 - **Comments** are `//` to end of line. Block comments (`/* */`) are *not*
-  implemented yet — they arrive in Phase 7, so `/*` currently lexes as `Slash`
+  implemented yet. They arrive in phase 7, so `/*` currently lexes as `Slash`
   then `Star`.
 - Trivia produces no tokens.
 
@@ -53,7 +53,7 @@ use mod pub true false in break continue const type impl self
 
 - `1.0`, `0.5`, with optional exponents: `1e10`, `2.5e-3`, `1E+5`.
 - A `.` only starts a fraction when a digit follows, so `0..10` lexes as
-  `Int(0) DotDot Int(10)` — the range is not a float.
+  `Int(0) DotDot Int(10)`, so the range is not a float.
 - `1.foo` (dot before an identifier) is `MalformedNumber`.
 - A dangling exponent marker is not consumed: `1e` is `Int(1)` followed by
   `Ident("e")`, not a broken float.
@@ -117,11 +117,11 @@ correctly). The `Eof` token's span is the empty range at the end of the file.
 
 `nex-lexer` exposes:
 
-- `tokenize(src) -> (Vec<Token>, Vec<LexError>)` — scan everything
-- `tokenize_kinds(src) -> Vec<TokenKind>` — drop the spans, for tests
-- `dump_tokens(src) -> String` — one `Kind@start..end` line per token (plus an
+- `tokenize(src) -> (Vec<Token>, Vec<LexError>)` scans everything
+- `tokenize_kinds(src) -> Vec<TokenKind>` drops the spans, for tests
+- `dump_tokens(src) -> String` gives one `Kind@start..end` line per token (plus an
   `-- errors --` section); the format used by `nex lex` and the snapshot tests
-- `Lexer` — the scanner itself, usable as an `Iterator` over tokens
+- `Lexer` is the scanner itself, usable as an `Iterator` over tokens
 
 ## Robustness guarantees
 

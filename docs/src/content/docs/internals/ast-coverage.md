@@ -1,109 +1,78 @@
 ---
 title: AST Coverage
-description: Every construct in language-design.md, checked against what the AST can actually represent today.
+description: What the AST can represent today, and what it can't.
 ---
 
-:::note[Status: phase 2 review pass]
-This page is the step 2.8 review: walk every construct in
-[Language Design](/language-design/) and `examples/tour.nex` and check it
-against what `crates/nex-syntax` can actually build today. It is a snapshot
-as of step 2.7 (expr/stmt/item/type/pattern all defined, plus the pretty
-printer) - re-check it before Phase 2 is called done.
-:::
+Every construct in the [language spec](/language-design/) and
+`examples/tour.nex`, checked against what `crates/nex-syntax` can actually
+build. Current as of step 3.11.
 
-## Fully covered
+## Covered
 
-These map cleanly onto an existing `ExprKind` / `StmtKind` / `ItemKind` /
-`TypeKind` / `PatternKind` variant:
-
-- Literals: `Int`, `Float`, `Str`, `Bool`, `Unit` (`ExprKind`)
-- Unary/binary operators, matching every operator in the spec's operator
-  table except `=` and the compound-assignment forms (see gaps below)
-- `call`, field access (`.`), indexing (`[]`), struct literals, `if`/`else`,
-  blocks, `match`, ranges (`..`, `..=`)
-- `let` / `let mut`, expression statements, `return`, `while`, `for`-`in`,
-  `break`, `continue`
-- `fn` (params, return type, generics), `struct`, `enum` (incl. generic
-  variant payloads), `use` (bare path)
-- Types: named (incl. generic args), `[T]` arrays, `&T` references, `fn(..)
-  -> T` function types
-- Patterns: wildcard, binding, literals, `Enum::Variant(..)`, `Struct { .. }`,
-  tuple
+| Area | Nodes |
+| ---- | ----- |
+| Literals | `Int`, `Float`, `Str`, `Bool`, `Unit` |
+| Operators | every operator in the spec's table except `=` and `+=`/`-=`/`*=`/`/=` |
+| Expressions | calls, field access, indexing, struct literals, `if`/`else`, blocks, `match`, ranges |
+| Statements | `let`, `let mut`, expression statements, `return`, `while`, `for`-`in`, `break`, `continue` |
+| Items | `fn` (params, return type, generics), `struct`, `enum`, `use` |
+| Types | named with generic args, `[T]`, `&T`, `fn(..) -> T` |
+| Patterns | wildcard, binding, literals, `Enum::Variant(..)`, `Struct { .. }`, tuple |
 
 ## Gaps
 
-Ranked by how much they'd surprise someone reading the spec.
+### No path expression
 
-### No path-qualified expression
+`ExprKind::Ident` holds one `Ident`, so a `::`-qualified name has nowhere to
+go. The spec's own sample doesn't parse because of this:
 
-`ExprKind::Ident` holds a single `Ident` — there is no multi-segment path
-expression. **The spec's own sample can't be represented yet**: `match
-Option::Some(x) { ... }` from `language-design.md` needs `Option::Some` as a
-callable expression, and nothing in `ExprKind` can hold a `::`-qualified
-name. `Field { base, field }` doesn't cover it either — `::` is a distinct
-token from `.`, and `Option` isn't itself an expression. This needs either a
-dedicated `ExprKind::Path(Vec<Ident>)` or for `Field`/a new variant to accept
-`::` segments. Likely lands alongside expression parsing in Phase 3, but the
-AST doesn't have a home for it yet.
+```rust
+match Option::Some(x) { ... }
+```
+
+Patterns handle `Option::Some(v)` fine, but the scrutinee is an expression and
+fails with ``expected `{`, found `::` ``. `Field { base, field }` isn't a
+substitute: `::` is a separate token from `.`, and `Option` on its own isn't an
+expression. Fixing it means adding `ExprKind::Path(Vec<Ident>)`.
+
+This is the one gap that blocks working nex code today.
 
 ### No assignment statement
 
-`x = 5;` and `x += 1;` have no `StmtKind`. `let`/`let mut` only cover
-*introducing* a binding, never reassigning one that `mut` already permits.
-This is deliberate, not forgotten — parser step 4.2 is titled "Assignment and
-compound assignment statements" — but the AST itself has zero shape for it
-right now.
+`x = 5;` and `x += 1;` have no `StmtKind`. `let` only introduces a binding, so
+there's currently no way to reassign one. Parser step 4.2 covers this.
 
-### No `const` item
+### No `const` or `type` items
 
-`examples/tour.nex` has `const MAX: i32 = 100;`; `ItemKind` has no `Const`
-variant. The `const` keyword is reserved by the lexer but nothing in
-`nex-syntax` consumes it.
-
-### No `type` alias item
-
-The `type` keyword is reserved (`fn let mut if else for while return struct
-enum match use mod pub true false in break continue const type impl self`)
-but there's no `ItemKind::TypeAlias` for `type Foo = Bar;`.
+`examples/tour.nex` uses `const MAX: i32 = 100;`. Both keywords are reserved by
+the lexer, but `ItemKind` has no `Const` or `TypeAlias` variant.
 
 ### No item visibility
 
-Nothing in `ItemKind` carries a `pub`/private flag, even though `pub` is a
-reserved keyword. Every item is implicitly "however the parser decides to
-treat it" until this lands.
+`pub` is a reserved keyword and nothing in `ItemKind` records it.
 
-### `impl` is a stub on purpose
+### `impl` is a stub
 
-`ItemKind::Impl` holds only the target type's `Ident` — no methods, no trait
-name. Methods need `Fn` items nested inside plus more of the type system
-wired through first; tracked in `progress.txt`, not a surprise.
+`ItemKind::Impl` holds the target type's name and nothing else. Methods need
+`Fn` items nested inside, which waits on the type system.
 
-### No `TypeKind::Unit`
+### No `()` type
 
-The spec's Types table lists `()` as "unit, the empty type." `ExprKind::Unit`
-exists (the *value* `()`), but `TypeKind` has no matching variant for the
-*type* `()` — an explicit `-> ()` return annotation can't be written yet,
-only omitted (`return_type: None`).
+`ExprKind::Unit` covers the value. There's no `TypeKind` for the type, so a
+function can omit its return type but can't write `-> ()` explicitly.
 
-### No tuple type or tuple expression
+### No tuple type or expression
 
-`PatternKind::Tuple` exists (required by step 2.6), but there is no
-`ExprKind::Tuple` or `TypeKind::Tuple` to match *against*. Worth noting:
-tuples aren't in the spec's Types table at all, so this may be an
-over-build in the pattern AST rather than an under-build elsewhere - revisit
-whether tuple patterns are even needed for v0.1 once the parser reaches
-patterns.
+`PatternKind::Tuple` exists, but there's nothing to match against: no
+`ExprKind::Tuple`, no `TypeKind::Tuple`. Tuples aren't in the spec's type table
+either, so the pattern may be the thing that's wrong here.
 
 ### `use` is a bare path
 
-No `as` aliasing, no `{}` grouped imports (`use std::{io, fs};`), no glob
-(`use foo::*;`). Just a flat `::`-separated `Vec<Ident>`.
+No `as` aliasing, no `{}` groups, no globs.
 
-## Out of scope for this review (already tracked elsewhere)
+## Tracked elsewhere
 
-- Block comments (`/* */`) and character literals (`'a'`) are lexer-level
-  gaps, not AST gaps — see the roadmap's "Deferred / pending" section.
-- Memory management (refcounting vs. ownership) is a Phase 8 decision with
-  no AST impact yet.
-- Generic *bounds*/`where` clauses aren't in the spec (no traits in v0.1),
-  so their absence from `generics: Vec<Ident>` isn't a gap.
+Block comments and character literals are lexer gaps, not AST gaps, and are on
+the [roadmap](/roadmap/). Memory management is a Phase 8 decision. Generic
+bounds aren't in the spec at all, since v0.1 has no traits.

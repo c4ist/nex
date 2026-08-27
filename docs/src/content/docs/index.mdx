@@ -47,15 +47,15 @@ dispatch, async, threads, macros, a central package registry. See
 
 ## What works today
 
-| Area           | Status                                                        |
-| -------------- | -------------------------------------------------------------- |
-| Lexer          | done — full token stream with error recovery                   |
-| AST foundation | in progress — expressions, statements, items, types all defined |
-| Parser         | not started (Phase 3)                                          |
-| Interpreter    | not started (Phase 5)                                          |
-| Type checker   | not started (Phase 6)                                          |
-| Codegen        | not started (Phases 8–9)                                       |
-| CLI            | `nex lex` works; `build`/`run`/`check`/`fmt`/`test` are stubs   |
+| Area | Status |
+| ---- | ------ |
+| Lexer | done, with error recovery |
+| AST | done: expressions, statements, items, types, patterns |
+| Parser | expressions done; statements and items next |
+| Interpreter | not started |
+| Type checker | not started |
+| Codegen | not started |
+| CLI | `nex lex` works, everything else is a stub |
 
 The only working subcommand today dumps the token stream:
 

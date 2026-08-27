@@ -78,9 +78,9 @@ borrow checking in v0.1.
 
 ## Execution
 
-1. **Phase 5** — tree-walking interpreter (`nex run`)
-2. **Phase 8** — LLVM native code generation (`nex build`)
-3. **Phase 9** — WebAssembly target (`nex build --target wasm32`)
+1. Phase 5: tree-walking interpreter (`nex run`)
+2. Phase 8: LLVM native code generation (`nex build`)
+3. Phase 9: WebAssembly target (`nex build --target wasm32`)
 
 All three must agree: the regression corpus is run under every available
 backend and the outputs must be identical.

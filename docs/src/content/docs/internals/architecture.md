@@ -3,127 +3,120 @@ title: Compiler Architecture
 description: Workspace layout and the design decisions already locked in.
 ---
 
-:::note[Status: foundations in place]
-This page describes the workspace layout and the design decisions that
-are already locked in. Parsing has started (scaffolding only, step 3.1);
-name resolution, type checking, and codegen are planned but not yet written.
-:::
+The lexer and the expression parser work. Statement and item parsing, name
+resolution, type checking and codegen are still to come.
 
 ## Workspace layout
 
-Nex is a Cargo workspace with three crates:
+| Crate | Responsibility | Depends on |
+| ----- | -------------- | ---------- |
+| `nex-lexer` | source text to tokens | nothing |
+| `nex-syntax` | AST types and the parser | `nex-lexer` |
+| `nex-driver` | the `nex` CLI | `nex-lexer`, `nex-syntax`, `clap`, `ariadne` |
 
-| Crate            | Responsibility                         | Dependencies              |
-| ----------------- | --------------------------------------- | -------------------------- |
-| `nex-lexer`      | source text → tokens (Phase 1, done)   | none                      |
-| `nex-syntax`     | AST types and the future parser        | `nex-lexer` (for `Span`)  |
-| `nex-driver`     | the `nex` CLI                          | `nex-lexer`, `clap`       |
-
-Dependencies are pinned exactly (e.g. `clap =4.5.23`, `insta =1.41.1`) because
-Cargo only became MSRV-aware in 1.84 and the workspace MSRV is 1.83.
+Dependency versions are pinned exactly (`clap =4.5.23`, `ariadne =0.5.1`,
+`insta =1.41.1`). Cargo only became MSRV-aware in 1.84 and the workspace MSRV
+is 1.83, so anything looser can resolve to a version that won't build.
 
 ## The compilation pipeline
 
 ```text
 source text
-   │  nex-lexer          (Phase 1 — done)
+   │  nex-lexer                        done
    ▼
 tokens
-   │  nex-syntax parser  (Phases 3–4 — scaffolding done, 3.1)
+   │  nex-syntax parser                expressions done
    ▼
 AST (immutable)
-   │  name resolution + type checker  (Phase 6 — planned)
+   │  name resolution + type checker   planned
    ▼
 checked AST
-   ├── tree-walking interpreter   (Phase 5 — planned)
-   ├── LLVM native codegen        (Phase 8 — planned)
-   └── WebAssembly codegen        (Phase 9 — planned)
+   ├── tree-walking interpreter        planned
+   ├── LLVM native codegen             planned
+   └── WebAssembly codegen             planned
 ```
 
-Every backend must agree: the regression corpus is run under every available
-backend and the outputs must be identical.
+Every backend has to agree. The regression corpus runs under all of them and
+the outputs must match.
 
-## AST design (locked in)
+## AST design
 
-The AST node plumbing lives in `nex-syntax` (`node.rs`). Two rules hold across
-the whole tree:
+The node plumbing lives in `nex-syntax/src/node.rs`. Two rules hold across the
+whole tree:
 
-1. **Every node has a `Span`**, so later passes (type checker, LSP) can always
-   point at the source text that caused something.
-2. **Every node has a unique `NodeId`**, so later passes can hang info off a
-   node in *side tables* instead of mutating the tree. The AST is immutable
-   once parsed.
+1. Every node has a `Span`, so later passes can always point at the source text
+   that caused something.
+2. Every node has a unique `NodeId`, so later passes can hang information off a
+   node in side tables instead of mutating it. The AST is immutable once
+   parsed.
 
-Key types:
+The types that implement this:
 
-- `NodeId(u32)` — dense, sequential ids handed out by `NodeIdGen` while
-  parsing one module. Because they are dense they double as indices into side
-  tables (`Vec<T>` keyed by `id.index()`).
-- `NodeId::DUMMY` — marks nodes synthesised during error recovery. It has no
-  side-table slot and deliberately **panics** on `.index()`, so a dummy can
-  never silently corrupt a side table.
-- `NodeInfo { id, span }` — the identity + location every AST node embeds.
-- `Spanned<T>` — attaches a span to a value that doesn't need its own identity
-  (an ident, a field name, an operator).
-- `Ident` = `Spanned<String>` — an identifier as written in the source.
-- `spanning(items, fallback)` — derives a parent node's span from its children.
+- `NodeId(u32)`, handed out in order by `NodeIdGen` while parsing a module.
+  They're dense, so they double as indices into side tables (`Vec<T>` keyed by
+  `id.index()`).
+- `NodeId::DUMMY` marks nodes invented during error recovery. It has no
+  side-table slot and panics on `.index()` rather than silently corrupting one.
+- `NodeInfo { id, span }`, embedded in every node.
+- `Spanned<T>` for values that need a span but not an identity: idents, field
+  names, operators.
+- `Ident`, an alias for `Spanned<String>`.
+- `spanning(items, fallback)` builds a parent's span from its children.
 
-Consequence for future passes: type information, resolved names, and lowering
-results all live in side tables keyed by `NodeId`, never in the tree itself.
+So type information, resolved names and lowering results all belong in side
+tables keyed by `NodeId`, never in the tree.
 
-The AST now covers expressions, statements, items (fn/struct/enum/use/mod/impl
-stub), types (named/generic/array/reference/fn), and patterns
-(wildcard/binding/literal/enum-variant/struct/tuple) — the full node set
-phase 2 set out to define. `Module` is the root: one parsed file's `Vec<Item>`
-plus its own `NodeInfo`.
+`Module` is the root: one file's `Vec<Item>` plus its own `NodeInfo`. The node
+set itself covers expressions, statements, items, types and patterns. See [AST
+coverage](/internals/ast-coverage/) for what it still can't represent.
 
-The [AST coverage review](/internals/ast-coverage/) tracks real gaps found
-against the spec — notably, expressions can't yet hold a `::`-qualified path
-(`Option::Some`), so the spec's own sample match statement can't be built as
-an `Expr` today.
+## The parser
 
-## The parser (`nex-syntax`, step 3.1)
+`Parser` wraps a `&[Token]` cursor with `peek`, `advance` and `expect`. It
+collects `ParseError`s rather than bailing on the first mistake, so one bad
+statement doesn't hide the rest of the file: `synchronize()` skips to the next
+`;` or `}` and parsing continues.
 
-`Parser` wraps a `&[Token]` cursor with `peek`/`advance`/`expect` and
-collects recoverable `ParseError`s instead of aborting on the first mistake.
-`advance()` is a no-op once the cursor reaches `Eof`, so callers can't walk
-off the end of the token stream. `parse_module()` is the entry point; item
-parsing itself starts in Phase 4, so for now it just reports one "item
-parsing arrives in Phase 4" error per leftover token and consumes it — an
-empty file parses to an empty `Module` cleanly, anything else terminates
-without a real result yet.
+Expressions use a Pratt loop. `infix_binding_power` holds the whole precedence
+table in one place, running from `||` at the loosest end to `*`, `/` and `%` at
+the tightest. Prefix operators bind tighter than any of them, postfix calls and
+field access tighter still, and ranges looser than all of it.
 
-## The CLI (`nex-driver`)
+One thing to know when reading it: `advance()` is a no-op at `Eof`, so any loop
+over tokens needs its own `Eof` case or it will spin.
 
-`nex` is a clap-based CLI. The full command surface exists (`build`, `run`,
-`check`, `fmt`, `test`, `lex`) but only `lex` is implemented; the others exit
-with a "not implemented yet; it arrives in Phase X" message, where X names the
-roadmap phase that delivers them.
+`parse_module()` is the entry point. Item parsing isn't written yet, so it
+handles an empty file and reports an error per leftover token otherwise.
 
-Diagnostics are currently rendered by a small dependency-free renderer in
-`nex-driver/src/diag.rs` that prints the offending line and a caret underline.
-It is a deliberate stopgap: it will be replaced by `ariadne` at step 3.11 once
-the parser starts producing richer diagnostics.
+## The CLI
 
-## Testing strategy
+`nex` is built on clap. All six subcommands exist (`build`, `run`, `check`,
+`fmt`, `test`, `lex`) but only `lex` does anything; the rest exit with a message
+naming the phase that delivers them.
 
-- **Unit tests** live next to the code (lexer, spans, node plumbing).
-- **Integration tests** in `crates/nex-lexer/tests/` cover literals, operators,
-  trivia and keywords, recovery, plus an insta snapshot suite (`golden.rs`)
-  that lexes the `examples/` programs and freezes the output. `nex-syntax`
-  has its own `Debug`-round-trip snapshot suites per node family
-  (`expr_debug.rs`, `stmt_debug.rs`, `item_debug.rs`, `type_debug.rs`).
-- **Robustness tests**: a deterministic mutation fuzzer (xorshift, no external
-  deps) runs 2 000 mutated copies of `examples/tour.nex` and asserts the lexer
-  always terminates, never panics, and always ends with `Eof`.
-- **CI** (GitHub Actions) runs `rustfmt --check` and clippy with
-  `-D warnings` on ubuntu, and the full test suite on ubuntu + windows.
-  The `justfile` (`just check`) and `scripts/check.ps1` run the same three
-  steps locally.
+Diagnostics go through `ariadne` (`nex-driver/src/diag.rs`). One wrinkle: nex
+spans are byte offsets while ariadne counts characters, so `diag.rs` converts
+between them. Skip that and the reported column drifts on any line with
+multi-byte characters in it.
 
-## Deferred / known gaps
+## Testing
 
-- `ariadne` diagnostics — step 3.11
-- CI does not yet install LLVM — needed from step 8.2
-- No benchmarks yet — parser throughput baseline is due at step 4.12
-- Block comments and character literals are not in the language (Phase 7)
+Unit tests sit next to the code. Integration tests in `crates/nex-lexer/tests/`
+cover literals, operators, trivia, keywords and error recovery, plus an insta
+snapshot suite that freezes the token stream for the `examples/` programs.
+`nex-syntax` has a `Debug` round-trip suite per node family and separate suites
+for the parser.
+
+A deterministic mutation fuzzer (xorshift, no dependencies) runs 2,000 mutated
+copies of `examples/tour.nex` and checks the lexer always terminates, never
+panics, and always ends with `Eof`.
+
+CI runs `rustfmt --check` and clippy with `-D warnings` on ubuntu, and the test
+suite on ubuntu and windows. `just check` and `scripts/check.ps1` run the same
+three steps locally.
+
+## Known gaps
+
+- CI doesn't install LLVM yet; needed once codegen starts.
+- No benchmarks. A parser throughput baseline is due at the end of phase 4.
+- Block comments and character literals aren't in the language yet.

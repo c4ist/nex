@@ -23,7 +23,7 @@ just check                # with `just` installed (see justfile)
 ```
 
 Both run `cargo fmt --check`, `cargo clippy -- -D warnings`, and
-`cargo test --workspace --all-targets`, in that order — the same checks as
+`cargo test --workspace --all-targets`, in that order. These are the checks
 GitHub Actions CI (rustfmt + clippy on ubuntu, tests on ubuntu and windows).
 
 ## Trying it out
@@ -76,8 +76,8 @@ full token and error catalogue.
 
 The `examples/` directory contains the sample programs used by the test suite:
 
-- `hello.nex` — minimal hello world
-- `tour.nex` — a tour of the planned syntax: structs, enums, generics, `const`,
+- `hello.nex`: minimal hello world
+- `tour.nex`: a tour of the planned syntax, covering structs, enums, generics, `const`,
   functions, `if`/`for`/`while`, ranges, `match`, and string escapes
 
 They lex cleanly today; they won't run until the interpreter lands (Phase 5).
@@ -113,6 +113,6 @@ Then open http://localhost:4321.
 The docs site lives in `docs/`, so the Vercel project must be rooted there:
 
 1. Push the repo to GitHub and import it at https://vercel.com/new.
-2. **Root directory: `docs`** — this is the important one.
+2. Set the root directory to `docs`. This is the one that matters.
 3. Framework preset: **Astro** (auto-detected from `package.json`).
 4. Deploy.
