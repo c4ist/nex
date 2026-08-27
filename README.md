@@ -2,8 +2,8 @@
 
 A lightweight, statically typed, compiled programming language.
 
-> **Status: pre-alpha.** The lexer works. Nothing runs yet.
-> Follow along in [`progress.txt`](progress.txt).
+> **Status: pre-alpha.** The lexer and expression parser work. Nothing runs
+> yet. Follow along in [`progress.txt`](progress.txt).
 
 ```nex
 fn main() {
@@ -25,6 +25,7 @@ for the spec.
 | Path                 | What it is                                    |
 | -------------------- | --------------------------------------------- |
 | `crates/nex-lexer`   | Source text to tokens                         |
+| `crates/nex-syntax`  | AST types and the parser                      |
 | `crates/nex-driver`  | The `nex` command line tool                   |
 | `examples/`          | Sample `.nex` programs used by the test suite |
 | `docs/`              | Language specification and documentation site |
@@ -80,7 +81,9 @@ one micro-step at a time in `progress.txt`.
 | ----- | -------------------------------- | ----------- |
 | 0     | Foundations                      | done        |
 | 1     | Lexer                            | done        |
-| 2–4   | AST and parser                   | next        |
+| 2     | AST design                       | done        |
+| 3     | Parser: expressions              | done        |
+| 4     | Parser: statements and items     | in progress |
 | 5     | Tree-walking interpreter         | planned     |
 | 6–7   | Type checker and language v0.1   | planned     |
 | 8–9   | LLVM and WebAssembly backends    | planned     |
@@ -88,6 +91,18 @@ one micro-step at a time in `progress.txt`.
 | 12–14 | Editor tooling, LSP, docs site   | planned     |
 | 15    | Polish and release               | planned     |
 
+## Contributing
+
+Nex is built in small numbered steps, one per commit, tracked in
+[`progress.txt`](progress.txt). If you want to take one on, open an issue
+first. Bug reports, tests and docs are welcome any time. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
-MIT OR Apache-2.0
+Dual licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT License ([LICENSE-MIT](LICENSE-MIT))
+
+at your option. Contributions are accepted under the same terms.

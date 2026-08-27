@@ -1,0 +1,41 @@
+name: Bug report
+description: Something in the compiler behaves wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: >
+        The nex source that triggers it, and the command you ran. Smaller is
+        better; cut it down to the least that still breaks.
+      render: shell
+      placeholder: |
+        cargo run -p nex-driver -- lex bug.nex
+
+        bug.nex:
+        fn main() { ... }
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`.
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and Rust version
+      placeholder: windows 11, rustc 1.83.0

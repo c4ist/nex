@@ -1,0 +1,34 @@
+name: Feature or language change
+description: Suggest something for the language or tooling
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Check [the roadmap](https://github.com/c4ist/nex/blob/main/progress.txt)
+        first. A lot is planned but not built yet, so it may already be on the
+        list.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want
+      description: Describe it, with a snippet of how it would look in nex.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: >
+        What's awkward without it? Nex is meant to stay small, so a feature
+        needs to earn the complexity it adds.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways to solve it, or how other languages handle it.
