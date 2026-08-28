@@ -4,7 +4,7 @@
 //! anything that went wrong is in `errors()`.
 
 use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
-use crate::item::{Fn, Item, ItemKind, Param};
+use crate::item::{FieldDef, Fn, Item, ItemKind, Param, Struct};
 use crate::module::Module;
 use crate::node::{Ident, NodeIdGen, NodeInfo, Spanned};
 use crate::pattern::{FieldPattern, Pattern, PatternKind};
@@ -837,7 +837,21 @@ impl<'a> Parser<'a> {
                 self.ty(TypeKind::Named { name, args }, span)
             }
             _ => {
-                self.advance();
+                // leave closers and separators alone: whatever contains this
+                // type still needs them to find its own end. consuming a `}`
+                // here would strip a struct of its closing brace.
+                if !matches!(
+                    tok.kind,
+                    TokenKind::RBrace
+                        | TokenKind::RParen
+                        | TokenKind::RBracket
+                        | TokenKind::Gt
+                        | TokenKind::Comma
+                        | TokenKind::Semi
+                        | TokenKind::Eof
+                ) {
+                    self.advance();
+                }
                 self.errors.push(ParseError::new(
                     format!("expected a type, found {}", tok.kind.describe()),
                     tok.span,
@@ -851,6 +865,18 @@ impl<'a> Parser<'a> {
                 )
             }
         }
+    }
+
+    /// stand-in for a type the source never wrote; the error has already
+    /// been reported by whatever noticed it was missing.
+    fn missing_type(&mut self, span: Span) -> Type {
+        Type::new(
+            TypeKind::Named {
+                name: Spanned::new(String::new(), span),
+                args: Vec::new(),
+            },
+            NodeInfo::dummy(span),
+        )
     }
 
     fn ty(&mut self, kind: TypeKind, span: Span) -> Type {
@@ -955,8 +981,12 @@ impl<'a> Parser<'a> {
                 break;
             }
             let param_name = self.expect_ident();
-            self.expect(TokenKind::Colon);
-            let ty = self.parse_type();
+            let colon = self.expect(TokenKind::Colon);
+            let ty = if colon.kind == TokenKind::Colon {
+                self.parse_type()
+            } else {
+                self.missing_type(colon.span)
+            };
             let span = param_name.span.merge(ty.info.span);
             params.push(Param::new(
                 param_name,
@@ -983,6 +1013,58 @@ impl<'a> Parser<'a> {
         let info = NodeInfo::new(self.ids.fresh(), span);
         self.item(
             ItemKind::Fn(Fn::new(name, generics, params, return_type, body, info)),
+            span,
+        )
+    }
+
+    /// `struct Point { x: f64, y: f64 }`. named fields only.
+    fn parse_struct(&mut self) -> Item {
+        let struct_tok = self.expect(TokenKind::Struct);
+        let name = self.expect_ident();
+        let generics = self.parse_generics();
+
+        let open = self.expect(TokenKind::LBrace);
+        if open.kind != TokenKind::LBrace {
+            let span = struct_tok.span.merge(open.span);
+            let info = NodeInfo::dummy(span);
+            return Item::new(
+                ItemKind::Struct(Struct::new(name, generics, Vec::new(), info)),
+                info,
+            );
+        }
+
+        let mut fields = Vec::new();
+        loop {
+            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
+                break;
+            }
+            let field_name = self.expect_ident();
+            // no `:` means no type follows; asking for one would report the
+            // same mistake twice
+            let colon = self.expect(TokenKind::Colon);
+            let ty = if colon.kind == TokenKind::Colon {
+                self.parse_type()
+            } else {
+                self.missing_type(colon.span)
+            };
+            let span = field_name.span.merge(ty.info.span);
+            fields.push(FieldDef::new(
+                field_name,
+                ty,
+                NodeInfo::new(self.ids.fresh(), span),
+            ));
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        let close = self.expect(TokenKind::RBrace);
+        let span = struct_tok.span.merge(close.span);
+        let info = NodeInfo::new(self.ids.fresh(), span);
+        self.item(
+            ItemKind::Struct(Struct::new(name, generics, fields, info)),
             span,
         )
     }
@@ -1014,13 +1096,20 @@ impl<'a> Parser<'a> {
         Item::new(kind, NodeInfo::new(self.ids.fresh(), span))
     }
 
-    /// only `fn` items so far; the rest of `ItemKind` follows.
+    /// `fn` and `struct` items so far; the rest of `ItemKind` follows.
     pub fn parse_module(&mut self) -> Module {
         let mut items = Vec::new();
         while !self.at_eof() {
-            if self.peek().kind == TokenKind::Fn {
-                items.push(self.parse_fn());
-                continue;
+            match self.peek().kind {
+                TokenKind::Fn => {
+                    items.push(self.parse_fn());
+                    continue;
+                }
+                TokenKind::Struct => {
+                    items.push(self.parse_struct());
+                    continue;
+                }
+                _ => {}
             }
 
             let tok = self.peek().clone();

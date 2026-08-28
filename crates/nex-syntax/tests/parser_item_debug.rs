@@ -93,3 +93,60 @@ fn parses_the_hello_world_example() {
         ["(fn main () () () (block (call print \"hello, world\")))"]
     );
 }
+
+// structs
+
+#[test]
+fn parses_a_struct() {
+    assert_eq!(
+        items("struct Point { x: f64, y: f64 }"),
+        ["(struct Point () ((x f64) (y f64)))"]
+    );
+}
+
+#[test]
+fn parses_an_empty_struct() {
+    assert_eq!(items("struct Unit {}"), ["(struct Unit () ())"]);
+}
+
+#[test]
+fn parses_a_generic_struct() {
+    assert_eq!(
+        items("struct Pair<A, B> { a: A, b: B }"),
+        ["(struct Pair (A B) ((a A) (b B)))"]
+    );
+}
+
+#[test]
+fn struct_fields_allow_a_trailing_comma() {
+    assert_eq!(items("struct S { a: i32, }"), ["(struct S () ((a i32)))"]);
+}
+
+#[test]
+fn struct_fields_take_any_type() {
+    assert_eq!(
+        items("struct S { a: [i32], b: &T, c: Option<T> }"),
+        ["(struct S () ((a (array i32)) (b (ref T)) (c (Option T))))"]
+    );
+}
+
+#[test]
+fn structs_and_functions_mix() {
+    let out = items("struct P { x: i32 } fn f() {}");
+    assert_eq!(out.len(), 2);
+    assert_eq!(out[0], "(struct P () ((x i32)))");
+}
+
+#[test]
+fn a_struct_field_missing_its_type_reports_an_error() {
+    let (_, errors) = parse("struct S { a }");
+    assert_eq!(errors, vec!["expected `:`, found `}`"]);
+}
+
+// a bad field type must not swallow the closing brace, or the struct loses
+// its end and everything after it cascades
+#[test]
+fn a_bad_struct_field_type_keeps_the_closing_brace() {
+    let (_, errors) = parse("struct S { a: 5 }");
+    assert_eq!(errors, vec!["expected a type, found integer literal"]);
+}
