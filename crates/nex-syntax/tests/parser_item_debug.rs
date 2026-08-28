@@ -150,3 +150,89 @@ fn a_bad_struct_field_type_keeps_the_closing_brace() {
     let (_, errors) = parse("struct S { a: 5 }");
     assert_eq!(errors, vec!["expected a type, found integer literal"]);
 }
+
+// enums
+
+#[test]
+fn parses_an_enum_with_unit_and_tuple_variants() {
+    assert_eq!(
+        items("enum Option<T> { Some(T), None }"),
+        ["(enum Option (T) ((Some T) (None)))"]
+    );
+}
+
+#[test]
+fn parses_an_enum_of_unit_variants() {
+    assert_eq!(
+        items("enum Colour { Red, Green, Blue }"),
+        ["(enum Colour () ((Red) (Green) (Blue)))"]
+    );
+}
+
+#[test]
+fn parses_a_variant_with_several_payload_types() {
+    assert_eq!(
+        items("enum E { Pair(i32, str) }"),
+        ["(enum E () ((Pair i32 str)))"]
+    );
+}
+
+#[test]
+fn parses_an_empty_enum() {
+    assert_eq!(items("enum Never {}"), ["(enum Never () ())"]);
+}
+
+#[test]
+fn enum_variants_allow_a_trailing_comma() {
+    assert_eq!(items("enum E { A, }"), ["(enum E () ((A)))"]);
+}
+
+#[test]
+fn a_bad_enum_payload_keeps_the_closing_brace() {
+    let (_, errors) = parse("enum E { A(5) }");
+    assert_eq!(errors, vec!["expected a type, found integer literal"]);
+}
+
+// struct variants aren't in the language spec, so `V { .. }` isn't a
+// variant form; the brace ends the enum instead
+#[test]
+fn struct_variants_are_not_supported() {
+    let (_, errors) = parse("enum E { V { a: i32 } }");
+    assert!(
+        !errors.is_empty(),
+        "expected a struct variant to be rejected"
+    );
+}
+
+// examples/tour.nex is blocked by exactly two known gaps: it uses a
+// `const` item, and it uses `Option::Some(x)` as an expression, which
+// ExprKind has no node for. this test will start failing when either is
+// fixed, which is the point.
+#[test]
+fn the_tour_example_is_blocked_only_by_known_gaps() {
+    let src = include_str!("../../../examples/tour.nex");
+
+    let (_, errors) = parse(src);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e == "expected an item, found `const`"),
+        "expected the const gap, got {errors:?}"
+    );
+
+    // drop the const line and the path expression is what's left
+    let without_const: String = src
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("const "))
+        .collect::<Vec<_>>()
+        .join(
+            "
+",
+        );
+    let (_, errors) = parse(&without_const);
+    assert_eq!(
+        errors.first().map(String::as_str),
+        Some("expected `{`, found `::`"),
+        "expected the path-expression gap, got {errors:?}"
+    );
+}

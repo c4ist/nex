@@ -4,7 +4,7 @@
 //! anything that went wrong is in `errors()`.
 
 use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
-use crate::item::{FieldDef, Fn, Item, ItemKind, Param, Struct};
+use crate::item::{Enum, FieldDef, Fn, Item, ItemKind, Param, Struct, Variant};
 use crate::module::Module;
 use crate::node::{Ident, NodeIdGen, NodeInfo, Spanned};
 use crate::pattern::{FieldPattern, Pattern, PatternKind};
@@ -1069,6 +1069,72 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// `enum Option<T> { Some(T), None }`. variants are unit or tuple;
+    /// struct variants aren't in the language.
+    fn parse_enum(&mut self) -> Item {
+        let enum_tok = self.expect(TokenKind::Enum);
+        let name = self.expect_ident();
+        let generics = self.parse_generics();
+
+        let open = self.expect(TokenKind::LBrace);
+        if open.kind != TokenKind::LBrace {
+            let span = enum_tok.span.merge(open.span);
+            let info = NodeInfo::dummy(span);
+            return Item::new(
+                ItemKind::Enum(Enum::new(name, generics, Vec::new(), info)),
+                info,
+            );
+        }
+
+        let mut variants = Vec::new();
+        loop {
+            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
+                break;
+            }
+
+            let variant_name = self.expect_ident();
+            let mut span = variant_name.span;
+            let mut payload = Vec::new();
+
+            if self.peek().kind == TokenKind::LParen {
+                self.advance();
+                loop {
+                    if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
+                        break;
+                    }
+                    payload.push(self.parse_type());
+                    if self.peek().kind == TokenKind::Comma {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                let close = self.expect(TokenKind::RParen);
+                span = span.merge(close.span);
+            }
+
+            variants.push(Variant::new(
+                variant_name,
+                payload,
+                NodeInfo::new(self.ids.fresh(), span),
+            ));
+
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        let close = self.expect(TokenKind::RBrace);
+        let span = enum_tok.span.merge(close.span);
+        let info = NodeInfo::new(self.ids.fresh(), span);
+        self.item(
+            ItemKind::Enum(Enum::new(name, generics, variants, info)),
+            span,
+        )
+    }
+
     /// `<T, U>`, or nothing. bare names only; nex has no bounds.
     fn parse_generics(&mut self) -> Vec<Ident> {
         if self.peek().kind != TokenKind::Lt {
@@ -1096,7 +1162,7 @@ impl<'a> Parser<'a> {
         Item::new(kind, NodeInfo::new(self.ids.fresh(), span))
     }
 
-    /// `fn` and `struct` items so far; the rest of `ItemKind` follows.
+    /// `fn`, `struct` and `enum` items; `use`, `mod` and `impl` follow.
     pub fn parse_module(&mut self) -> Module {
         let mut items = Vec::new();
         while !self.at_eof() {
@@ -1107,6 +1173,10 @@ impl<'a> Parser<'a> {
                 }
                 TokenKind::Struct => {
                     items.push(self.parse_struct());
+                    continue;
+                }
+                TokenKind::Enum => {
+                    items.push(self.parse_enum());
                     continue;
                 }
                 _ => {}

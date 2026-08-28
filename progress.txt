@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.6
+last_step = 4.7
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.7 (enum items: unit, tuple and struct variants)
+next_step = 4.8 (use / mod / pub items, paths only)
 
 Phase status
 ------------
@@ -14,7 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.6 done)
+[~] Phase 4  Parser: statements & items   (4.1-4.7 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -176,6 +176,15 @@ Design notes
   fails, since eating a `}` stripped the enclosing struct of its brace and
   cascaded; and a missing `:` in a field or param skips the type parse
   rather than reporting the same mistake twice.
+- enum items (4.7) parse unit and tuple variants. The plan text for this
+  step also lists STRUCT variants, but language-design.md has no syntax for
+  them anywhere (its only enum is `enum Option<T> { Some(T), None }`) and
+  Variant.fields is a Vec<Type> with no room for names. Built what the spec
+  defines rather than inventing a feature; needs a decision before the spec
+  freezes in phase 7.
+- examples/tour.nex is now blocked by exactly two known gaps: the `const`
+  item (plan step 7.11) and the path expression `Option::Some(x)`. Pinned
+  by a test that fails once either is fixed.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,
