@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.3
+last_step = 4.4
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.4 (while loops and for-in loops)
+next_step = 4.5 (function items: params, -> ret, generics <T>, body)
 
 Phase status
 ------------
@@ -14,7 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.3 done)
+[~] Phase 4  Parser: statements & items   (4.1-4.4 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -164,6 +164,13 @@ Design notes
 - return (4.3) treats the value as optional by looking ahead for `;`, `}`
   or Eof, so `return` at the end of a block is bare rather than trying to
   parse the brace as an expression.
+- loops (4.4) put the header in without_struct_literals, same as an if
+  condition, so `while x { }` is a loop rather than a struct literal.
+- a statement ending in a braced body needs no `;` before the next one
+  (needs_semi in parser.rs), matching rust. Without this `while a { } b`
+  was a parse error, since the block loop treated a missing semicolon as
+  the end of the block. Found by parsing the spec's sample main(), which
+  now parses clean end to end and is pinned by a test.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

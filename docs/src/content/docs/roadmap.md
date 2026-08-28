@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 4.3
+- **last step:** 4.4
 - **current phase:** 4 (parser: statements and items)
-- **next step:** 4.4, `while` and `for`-`in` loops
+- **next step:** 4.5, function items
 
 ## Phase status
 

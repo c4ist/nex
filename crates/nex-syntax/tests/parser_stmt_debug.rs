@@ -185,3 +185,116 @@ fn control_flow_mixes_with_other_statements() {
         "(block (let x 1) (+= x 1) (return x))"
     );
 }
+
+// loops
+
+#[test]
+fn parses_a_while_loop() {
+    assert_eq!(sexp("while a { b; }"), "(block (while a (block b)))");
+    assert_eq!(sexp("while true { }"), "(block (while true (block)))");
+}
+
+#[test]
+fn parses_a_for_in_loop() {
+    assert_eq!(
+        sexp("for i in 0..10 { print(i); }"),
+        "(block (for-in i (range 0 10) (block (call print i))))"
+    );
+}
+
+#[test]
+fn a_for_loop_iterates_any_expression() {
+    assert_eq!(sexp("for x in xs { }"), "(block (for-in x xs (block)))");
+    assert_eq!(
+        sexp("for x in f(a) { }"),
+        "(block (for-in x (call f a) (block)))"
+    );
+}
+
+// same ambiguity as an if condition: `while x { }` is a loop, not a struct
+// literal followed by nothing
+#[test]
+fn loop_headers_are_not_struct_literals() {
+    assert_eq!(sexp("while x { }"), "(block (while x (block)))");
+    assert_eq!(sexp("for i in x { }"), "(block (for-in i x (block)))");
+}
+
+#[test]
+fn loops_nest_and_contain_statements() {
+    assert_eq!(
+        sexp("while a { for i in b { continue; } }"),
+        "(block (while a (block (for-in i b (block (continue))))))"
+    );
+}
+
+#[test]
+fn loop_bodies_take_control_flow() {
+    assert_eq!(
+        sexp("while a { if b { break; } }"),
+        "(block (while a (block (if b (block (break))))))"
+    );
+}
+
+#[test]
+fn a_for_loop_without_in_reports_an_error() {
+    let (_, errors) = parse("for i 0..10 { }");
+    assert_eq!(errors, vec!["expected `in`, found integer literal"]);
+}
+
+#[test]
+fn a_while_without_a_body_reports_an_error() {
+    // the helper wraps input in a block, so `}` is what turns up here
+    let (_, errors) = parse("while a");
+    assert_eq!(errors, vec!["expected `{`, found `}`"]);
+}
+
+// a statement ending in a braced body doesn't need a semicolon before the
+// next one, the same rule rust uses
+#[test]
+fn block_like_statements_need_no_semicolon() {
+    assert_eq!(sexp("while a { } b"), "(block (while a (block)) b)");
+    assert_eq!(sexp("for i in x { } b"), "(block (for-in i x (block)) b)");
+    assert_eq!(sexp("if a { } b"), "(block (if a (block)) b)");
+    assert_eq!(sexp("match a { _ => b } c"), "(block (match a (_ b)) c)");
+    assert_eq!(sexp("{ a } b"), "(block (block a) b)");
+}
+
+// ...but one is still allowed
+#[test]
+fn block_like_statements_still_accept_a_semicolon() {
+    assert_eq!(sexp("while a { }; b"), "(block (while a (block)) b)");
+    assert_eq!(sexp("if a { }; b"), "(block (if a (block)) b)");
+}
+
+// an ordinary expression without a semicolon is the block's value, so it
+// still ends the block
+#[test]
+fn a_trailing_expression_still_ends_the_block() {
+    assert_eq!(sexp("let x = 1; x"), "(block (let x 1) x)");
+}
+
+// the body of the sample program in the language spec
+#[test]
+fn parses_the_spec_sample_main_body() {
+    let src = r#"
+        let x = 5;
+        let mut s = "hi";
+        if x > 3 { print("big"); } else { print("small"); }
+        for i in 0..10 { print(i); }
+        let p = Point { x: 1.0, y: 2.0 };
+        while x > 0 { x -= 1; }
+        return x;
+    "#;
+    let (printed, errors) = parse(src);
+    assert_eq!(errors, Vec::<String>::new());
+    assert!(printed.contains("(for-in i (range 0 10)"), "{printed}");
+    assert!(
+        printed.contains("(struct-lit Point (x 1) (y 2))"),
+        "{printed}"
+    );
+    assert!(
+        printed.contains("(while (> x 0) (block (-= x 1)))"),
+        "{printed}"
+    );
+    assert!(printed.ends_with("(return x))"), "{printed}");
+}

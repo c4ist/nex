@@ -58,6 +58,22 @@ fn assign_op(kind: &TokenKind) -> Option<Option<BinaryOp>> {
     }
 }
 
+/// whether a statement has to be followed by `;` to be a statement rather
+/// than the block's trailing value.
+///
+/// anything ending in a braced body doesn't: `while a { } b` is two
+/// statements, not a missing semicolon.
+fn needs_semi(stmt: &Stmt) -> bool {
+    match &stmt.kind {
+        StmtKind::While { .. } | StmtKind::ForIn { .. } => false,
+        StmtKind::Expr(e) => !matches!(
+            e.kind,
+            ExprKind::If { .. } | ExprKind::Match { .. } | ExprKind::Block(_)
+        ),
+        _ => true,
+    }
+}
+
 fn prefix_op(kind: &TokenKind) -> Option<UnaryOp> {
     match kind {
         TokenKind::Minus => Some(UnaryOp::Neg),
@@ -720,6 +736,33 @@ impl<'a> Parser<'a> {
         Stmt::new(kind, NodeInfo::new(self.ids.fresh(), span))
     }
 
+    /// `while cond { .. }`
+    fn parse_while(&mut self) -> Stmt {
+        let while_tok = self.expect(TokenKind::While);
+        let cond = self.without_struct_literals(|p| p.parse_expr());
+        let body = self.parse_block();
+        let span = while_tok.span.merge(body.info.span);
+        self.stmt(StmtKind::While { cond, body }, span)
+    }
+
+    /// `for x in 0..10 { .. }`. the binding is a plain name, not a pattern.
+    fn parse_for(&mut self) -> Stmt {
+        let for_tok = self.expect(TokenKind::For);
+        let binding = self.expect_ident();
+        self.expect(TokenKind::In);
+        let iter = self.without_struct_literals(|p| p.parse_expr());
+        let body = self.parse_block();
+        let span = for_tok.span.merge(body.info.span);
+        self.stmt(
+            StmtKind::ForIn {
+                binding,
+                iter,
+                body,
+            },
+            span,
+        )
+    }
+
     /// `i32`, `Option<T>`, `[T]`, `&T`, `fn(A, B) -> C`
     fn parse_type(&mut self) -> Type {
         let tok = self.peek().clone();
@@ -817,6 +860,8 @@ impl<'a> Parser<'a> {
         match self.peek().kind {
             TokenKind::Let => return self.parse_let(),
             TokenKind::Return => return self.parse_return(),
+            TokenKind::While => return self.parse_while(),
+            TokenKind::For => return self.parse_for(),
             TokenKind::Break => {
                 let tok = self.advance();
                 return self.stmt(StmtKind::Break, tok.span);
@@ -864,7 +909,9 @@ impl<'a> Parser<'a> {
             }
 
             let errors_before = self.errors.len();
-            stmts.push(self.parse_stmt());
+            let stmt = self.parse_stmt();
+            let semi_required = needs_semi(&stmt);
+            stmts.push(stmt);
 
             if self.errors.len() > errors_before {
                 self.synchronize();
@@ -873,7 +920,9 @@ impl<'a> Parser<'a> {
 
             if self.peek().kind == TokenKind::Semi {
                 self.advance();
-            } else {
+            } else if semi_required {
+                // no semicolon and one was needed, so this was the block's
+                // trailing value expression
                 break;
             }
         }
