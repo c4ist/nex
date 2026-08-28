@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 4.4
+- **last step:** 4.5
 - **current phase:** 4 (parser: statements and items)
-- **next step:** 4.5, function items
+- **next step:** 4.6, `struct` items
 
 ## Phase status
 

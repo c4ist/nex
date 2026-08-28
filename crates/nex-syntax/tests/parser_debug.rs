@@ -68,19 +68,18 @@ fn expect_records_an_error_on_a_mismatched_token_but_still_returns_it() {
     assert_eq!(parser.errors()[0].span, tok.span);
 }
 
-// until items are parsed, a non-empty file reports one error per leftover
-// token rather than dropping them silently
+// junk at the top level is reported and consumed, so parsing terminates
+// instead of stalling on a token nothing accepts
 #[test]
-fn parse_module_reports_every_leftover_token_for_non_empty_input() {
-    let (tokens, lex_errors) = nex_lexer::tokenize("fn main() {}");
+fn parse_module_reports_and_skips_tokens_that_cannot_start_an_item() {
+    let (tokens, lex_errors) = nex_lexer::tokenize("+ + +");
     assert!(lex_errors.is_empty());
-    let non_eof_token_count = tokens.iter().filter(|t| !t.is_eof()).count();
 
     let (module, errors) = parse_module(&tokens);
     assert_eq!(module.items, Vec::new());
-    assert_eq!(errors.len(), non_eof_token_count);
+    assert_eq!(errors.len(), 3);
     for err in &errors {
         let ParseError { message, .. } = err;
-        assert_eq!(message, "item parsing is not implemented yet");
+        assert_eq!(message, "expected an item, found `+`");
     }
 }

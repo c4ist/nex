@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.4
+last_step = 4.5
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.5 (function items: params, -> ret, generics <T>, body)
+next_step = 4.6 (struct items, named fields only)
 
 Phase status
 ------------
@@ -14,7 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.4 done)
+[~] Phase 4  Parser: statements & items   (4.1-4.5 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -76,10 +76,8 @@ Design notes
   type; phase 2 didn't need it since nothing parsed a whole file yet.
 - Parser (parser.rs) wraps a `&[Token]` cursor: peek/advance/expect plus a
   recoverable Vec<ParseError>. advance() is a no-op at Eof so callers can't
-  walk off the end. parse_module() doesn't parse items yet (phase 4) - for
-  now it records one "item parsing arrives in Phase 4" ParseError per
-  leftover token and consumes it, so non-empty input still terminates
-  instead of looping forever with nothing to do.
+  walk off the end. parse_module() handles `fn` items as of 4.5; anything
+  else at the top level is reported and skipped so parsing terminates.
 - parse_expr() (3.3) is a pratt loop. The precedence ladder lives in one
   table, infix_binding_power(), running lowest-to-highest: || && compare
   | ^ & shift +- */% then PREFIX_BP for unary. Left-associativity is
@@ -171,6 +169,8 @@ Design notes
   was a parse error, since the block loop treated a missing semicolon as
   the end of the block. Found by parsing the spec's sample main(), which
   now parses clean end to end and is pinned by a test.
+- fn items (4.5) parse generics, params, an optional `-> ret` and a body.
+  examples/hello.nex now parses as a whole file, pinned by a test.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

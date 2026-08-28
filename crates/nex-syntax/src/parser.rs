@@ -4,8 +4,9 @@
 //! anything that went wrong is in `errors()`.
 
 use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
+use crate::item::{Fn, Item, ItemKind, Param};
 use crate::module::Module;
-use crate::node::{NodeIdGen, NodeInfo, Spanned};
+use crate::node::{Ident, NodeIdGen, NodeInfo, Spanned};
 use crate::pattern::{FieldPattern, Pattern, PatternKind};
 use crate::stmt::{Stmt, StmtKind};
 use crate::ty::{Type, TypeKind};
@@ -941,12 +942,90 @@ impl<'a> Parser<'a> {
     }
 
     /// items aren't parsed yet, so this only really handles an empty file
+    /// `fn name<T>(a: i32) -> i32 { .. }`
+    fn parse_fn(&mut self) -> Item {
+        let fn_tok = self.expect(TokenKind::Fn);
+        let name = self.expect_ident();
+        let generics = self.parse_generics();
+
+        self.expect(TokenKind::LParen);
+        let mut params = Vec::new();
+        loop {
+            if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
+                break;
+            }
+            let param_name = self.expect_ident();
+            self.expect(TokenKind::Colon);
+            let ty = self.parse_type();
+            let span = param_name.span.merge(ty.info.span);
+            params.push(Param::new(
+                param_name,
+                ty,
+                NodeInfo::new(self.ids.fresh(), span),
+            ));
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        self.expect(TokenKind::RParen);
+
+        let return_type = if self.peek().kind == TokenKind::Arrow {
+            self.advance();
+            Some(self.parse_type())
+        } else {
+            None
+        };
+
+        let body = self.parse_block();
+        let span = fn_tok.span.merge(body.info.span);
+        let info = NodeInfo::new(self.ids.fresh(), span);
+        self.item(
+            ItemKind::Fn(Fn::new(name, generics, params, return_type, body, info)),
+            span,
+        )
+    }
+
+    /// `<T, U>`, or nothing. bare names only; nex has no bounds.
+    fn parse_generics(&mut self) -> Vec<Ident> {
+        if self.peek().kind != TokenKind::Lt {
+            return Vec::new();
+        }
+        self.advance();
+
+        let mut generics = Vec::new();
+        loop {
+            if matches!(self.peek().kind, TokenKind::Gt | TokenKind::Eof) {
+                break;
+            }
+            generics.push(self.expect_ident());
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        self.expect(TokenKind::Gt);
+        generics
+    }
+
+    fn item(&mut self, kind: ItemKind, span: Span) -> Item {
+        Item::new(kind, NodeInfo::new(self.ids.fresh(), span))
+    }
+
+    /// only `fn` items so far; the rest of `ItemKind` follows.
     pub fn parse_module(&mut self) -> Module {
-        let items = Vec::new();
+        let mut items = Vec::new();
         while !self.at_eof() {
+            if self.peek().kind == TokenKind::Fn {
+                items.push(self.parse_fn());
+                continue;
+            }
+
             let tok = self.peek().clone();
             self.errors.push(ParseError::new(
-                "item parsing is not implemented yet",
+                format!("expected an item, found {}", tok.kind.describe()),
                 tok.span,
             ));
             self.advance();
