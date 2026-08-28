@@ -688,15 +688,36 @@ impl<'a> Parser<'a> {
         };
 
         let span = let_tok.span.merge(value.info.span);
-        Stmt::new(
+        self.stmt(
             StmtKind::Let {
                 mutable,
                 name,
                 ty,
                 value,
             },
-            NodeInfo::new(self.ids.fresh(), span),
+            span,
         )
+    }
+
+    /// `return;` or `return expr;`
+    fn parse_return(&mut self) -> Stmt {
+        let ret = self.expect(TokenKind::Return);
+
+        // nothing to return if the statement ends here, or if the block does
+        if matches!(
+            self.peek().kind,
+            TokenKind::Semi | TokenKind::RBrace | TokenKind::Eof
+        ) {
+            return self.stmt(StmtKind::Return(None), ret.span);
+        }
+
+        let value = self.with_struct_literals(|p| p.parse_expr());
+        let span = ret.span.merge(value.info.span);
+        self.stmt(StmtKind::Return(Some(value)), span)
+    }
+
+    fn stmt(&mut self, kind: StmtKind, span: Span) -> Stmt {
+        Stmt::new(kind, NodeInfo::new(self.ids.fresh(), span))
     }
 
     /// `i32`, `Option<T>`, `[T]`, `&T`, `fn(A, B) -> C`
@@ -793,8 +814,18 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stmt(&mut self) -> Stmt {
-        if self.peek().kind == TokenKind::Let {
-            return self.parse_let();
+        match self.peek().kind {
+            TokenKind::Let => return self.parse_let(),
+            TokenKind::Return => return self.parse_return(),
+            TokenKind::Break => {
+                let tok = self.advance();
+                return self.stmt(StmtKind::Break, tok.span);
+            }
+            TokenKind::Continue => {
+                let tok = self.advance();
+                return self.stmt(StmtKind::Continue, tok.span);
+            }
+            _ => {}
         }
 
         // an assignment starts out looking like an expression, so parse one
@@ -805,18 +836,18 @@ impl<'a> Parser<'a> {
             self.advance();
             let value = self.with_struct_literals(|p| p.parse_expr());
             let span = expr.info.span.merge(value.info.span);
-            return Stmt::new(
+            return self.stmt(
                 StmtKind::Assign {
                     target: expr,
                     op,
                     value,
                 },
-                NodeInfo::new(self.ids.fresh(), span),
+                span,
             );
         }
 
         let span = expr.info.span;
-        Stmt::new(StmtKind::Expr(expr), NodeInfo::new(self.ids.fresh(), span))
+        self.stmt(StmtKind::Expr(expr), span)
     }
 
     fn parse_block(&mut self) -> Block {

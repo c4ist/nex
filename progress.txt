@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.2
+last_step = 4.3
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.3 (return, break, continue, expression statements)
+next_step = 4.4 (while loops and for-in loops)
 
 Phase status
 ------------
@@ -14,7 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.2 done)
+[~] Phase 4  Parser: statements & items   (4.1-4.3 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -161,6 +161,9 @@ Design notes
   parse_stmt parses an expression first and only then looks for an
   assignment operator, since the two start out identical. Assignment is a
   statement, not an expression, so `x = y = 1` does not chain.
+- return (4.3) treats the value as optional by looking ahead for `;`, `}`
+  or Eof, so `return` at the end of a block is bare rather than trying to
+  parse the brace as an expression.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

@@ -151,3 +151,37 @@ fn an_assignment_without_a_value_reports_an_error() {
     let (_, errors) = parse("x = ;");
     assert_eq!(errors, vec!["expected an expression, found `;`"]);
 }
+
+// return, break, continue
+
+#[test]
+fn parses_return_with_a_value() {
+    assert_eq!(sexp("return 5;"), "(block (return 5))");
+    assert_eq!(sexp("return a + b;"), "(block (return (+ a b)))");
+}
+
+#[test]
+fn parses_a_bare_return() {
+    assert_eq!(sexp("return;"), "(block (return))");
+}
+
+// the value is optional, so `return` right before `}` is bare rather than
+// swallowing the brace
+#[test]
+fn a_return_at_the_end_of_a_block_needs_no_semicolon() {
+    assert_eq!(sexp("return"), "(block (return))");
+}
+
+#[test]
+fn parses_break_and_continue() {
+    assert_eq!(sexp("break;"), "(block (break))");
+    assert_eq!(sexp("continue;"), "(block (continue))");
+}
+
+#[test]
+fn control_flow_mixes_with_other_statements() {
+    assert_eq!(
+        sexp("let x = 1; x += 1; return x;"),
+        "(block (let x 1) (+= x 1) (return x))"
+    );
+}
