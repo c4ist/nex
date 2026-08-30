@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/nex-lexer",
     "crates/nex-syntax",
+    "crates/nex-interp",
     "crates/nex-driver",
 ]
 
@@ -16,6 +17,7 @@ rust-version = "1.83"
 [workspace.dependencies]
 nex-lexer = { path = "crates/nex-lexer" }
 nex-syntax = { path = "crates/nex-syntax" }
+nex-interp = { path = "crates/nex-interp" }
 # pinned to the newest releases that still build on our msrv (1.83). cargo only
 # became msrv-aware in 1.84 so these have to be exact.
 clap = { version = "=4.5.23", features = ["derive"] }

@@ -12,6 +12,7 @@ Name resolution, type checking and codegen are still to come.
 | ----- | -------------- | ---------- |
 | `nex-lexer` | source text to tokens | nothing |
 | `nex-syntax` | AST types and the parser | `nex-lexer` |
+| `nex-interp` | the tree-walking interpreter | `nex-lexer`, `nex-syntax` |
 | `nex-driver` | the `nex` CLI | `nex-lexer`, `nex-syntax`, `clap`, `ariadne` |
 
 Dependency versions are pinned exactly (`clap =4.5.23`, `ariadne =0.5.1`,

@@ -179,6 +179,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nex-interp"
+version = "0.0.1"
+dependencies = [
+ "insta",
+ "nex-lexer",
+ "nex-syntax",
+]
+
+[[package]]
 name = "nex-lexer"
 version = "0.0.1"
 dependencies = [

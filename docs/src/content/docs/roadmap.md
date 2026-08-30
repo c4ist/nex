@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 4.12
+- **last step:** 5.1
 - **current phase:** 5 (tree-walking interpreter)
-- **next step:** 5.1, the interpreter crate and its `Value` type
+- **next step:** 5.2, lexical scopes
 
 ## Phase status
 

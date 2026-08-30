@@ -4,9 +4,10 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.12
-current_phase = 5 (Tree-walk interpreter) - starting
-next_step = 5.1 (create crates/nex-interp; define the Value enum)
+last_step = 5.1
+current_phase = 5 (Tree-walk interpreter) - in progress
+next_step = 5.2 (Environment with lexical scopes: push/pop, define, assign,
+            lookup)
 
 Phase status
 ------------
@@ -15,7 +16,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[ ] Phase 5  Tree-walk interpreter
+[~] Phase 5  Tree-walk interpreter   (5.1 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -200,6 +201,15 @@ Design notes
   checks the parser never panics. A third test asserts non-empty input
   always produces items or errors, which catches the parser stalling -
   a plain no-panic check would not.
+- Value (nex-interp, 5.1). Heap values (str, array, struct, enum, fn) sit
+  behind Rc so cloning a Value is cheap and two bindings share the same
+  array. Arrays and struct fields are RefCell for mutation later.
+- Only Bool is truthy; as_bool() returns None for everything else, so the
+  interpreter can reject `if 1 { }` rather than inventing a conversion.
+- Display is what `print` writes: strings bare, floats keeping their `.0`
+  so they stay distinguishable from ints. Debug quotes strings instead.
+- Fn values compare by Rc identity. Comparing bodies would be surprising
+  and comparing names would be wrong.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,
