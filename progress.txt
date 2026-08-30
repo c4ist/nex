@@ -4,10 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.11
-current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.12 (benchmark parse throughput on a generated 10k-line file,
-            record the baseline here)
+last_step = 4.12
+current_phase = 5 (Tree-walk interpreter) - starting
+next_step = 5.1 (create crates/nex-interp; define the Value enum)
 
 Phase status
 ------------
@@ -15,7 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.11 done)
+[x] Phase 4  Parser: statements & items
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -31,7 +30,13 @@ Phase status
 Pending / deferred
 ------------------
 - CI does not yet install LLVM; needed from step 8.2.
-- No benchmarks yet; parser throughput baseline is due at step 4.12.
+- Parser throughput baseline (4.12), on a generated 10k-line file of 83,751
+  tokens, measured on the dev machine:
+    debug    lex 23.9ms, parse 12.6ms, total 36.4ms   (~274k lines/sec)
+    release  lex  4.1ms, parse  6.5ms, total 10.5ms   (~948k lines/sec)
+  crates/nex-syntax/tests/throughput.rs re-measures this on every test run
+  and fails only on something pathological, since the numbers move with
+  the machine. Compare against these figures when tuning.
 - step 2.8 coverage review (docs/src/content/docs/internals/ast-coverage.md)
   found real AST gaps beyond the already-tracked ones above: no path-qualified
   EXPRESSION (`Option::Some` can't be written as an Expr - the spec's own

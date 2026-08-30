@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 4.11
-- **current phase:** 4 (parser: statements and items)
-- **next step:** 4.12, a parser throughput baseline
+- **last step:** 4.12
+- **current phase:** 5 (tree-walking interpreter)
+- **next step:** 5.1, the interpreter crate and its `Value` type
 
 ## Phase status
 
@@ -22,8 +22,8 @@ one step per commit, no skipping ahead.
 | 1     | Lexer                              | done        |
 | 2     | AST design                         | done        |
 | 3     | Parser: expressions                | done        |
-| 4     | Parser: statements & items         | in progress |
-| 5     | Tree-walking interpreter           | planned     |
+| 4     | Parser: statements & items         | done        |
+| 5     | Tree-walking interpreter           | in progress |
 | 6     | Name resolution + type checker     | planned     |
 | 7     | Language feature wave 2            | planned     |
 | 8     | LLVM backend                       | planned     |
@@ -73,7 +73,8 @@ documentation site.
 ## Deferred / pending
 
 - CI doesn't install LLVM yet. Needed from step 8.2.
-- No benchmarks. A parser throughput baseline is due at step 4.12.
+- Parser throughput on a 10k-line file: ~274k lines/sec debug, ~948k
+  release. Re-measured by `crates/nex-syntax/tests/throughput.rs`.
 - Block comments (`/* */`) arrive in Phase 7; they currently lex as operators.
 - Character literals (`'a'`) are not in the language.
 
