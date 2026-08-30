@@ -3,10 +3,11 @@
 use std::rc::Rc;
 
 use nex_lexer::Span;
-use nex_syntax::{BinaryOp, Expr, ExprKind, UnaryOp};
+use nex_syntax::{BinaryOp, Block, Expr, ExprKind, Stmt, StmtKind, UnaryOp};
 
 use crate::env::Scope;
 use crate::error::{Result, RuntimeError};
+use crate::flow::Flow;
 use crate::value::Value;
 
 pub struct Interpreter {
@@ -54,6 +55,10 @@ impl Interpreter {
 
             ExprKind::Binary { op, lhs, rhs } => self.binary_expr(expr, op.value, lhs, rhs, scope),
 
+            ExprKind::Block(block) => Ok(self.exec_block(block, scope)?.value()),
+
+            ExprKind::If { .. } => Ok(self.eval_if(expr, scope)?.value()),
+
             other => Err(RuntimeError::new(
                 format!("{} is not supported yet", describe(other)),
                 expr.info.span,
@@ -88,6 +93,144 @@ impl Interpreter {
         let left = self.eval_in(lhs, scope)?;
         let right = self.eval_in(rhs, scope)?;
         binary(op, left, right, expr.info.span)
+    }
+}
+
+impl Interpreter {
+    /// runs a block in its own scope, so bindings inside it don't leak.
+    /// the block's value is its last expression statement, matching what
+    /// the parser documents.
+    pub fn exec_block(&mut self, block: &Block, scope: &Rc<Scope>) -> Result<Flow> {
+        let inner = Scope::child(scope);
+        let mut value = Value::Unit;
+
+        for stmt in &block.stmts {
+            let flow = self.exec_stmt(stmt, &inner)?;
+            if flow.is_jump() {
+                return Ok(flow);
+            }
+            value = flow.value();
+        }
+
+        Ok(Flow::Normal(value))
+    }
+
+    pub fn exec_stmt(&mut self, stmt: &Stmt, scope: &Rc<Scope>) -> Result<Flow> {
+        match &stmt.kind {
+            StmtKind::Expr(expr) => {
+                // an if or a block in statement position can itself break
+                // or return, so it needs the flow-aware path
+                match &expr.kind {
+                    ExprKind::Block(block) => self.exec_block(block, scope),
+                    ExprKind::If { .. } => self.eval_if(expr, scope),
+                    _ => Ok(Flow::Normal(self.eval_in(expr, scope)?)),
+                }
+            }
+
+            StmtKind::Let { name, value, .. } => {
+                let value = self.eval_in(value, scope)?;
+                scope.define(name.value.clone(), value);
+                Ok(Flow::Normal(Value::Unit))
+            }
+
+            StmtKind::Assign { target, op, value } => {
+                self.exec_assign(target, *op, value, scope)?;
+                Ok(Flow::Normal(Value::Unit))
+            }
+
+            StmtKind::While { cond, body } => {
+                loop {
+                    let test = self.eval_in(cond, scope)?;
+                    if !as_bool(&test, cond.info.span)? {
+                        break;
+                    }
+                    match self.exec_block(body, scope)? {
+                        // `continue` ends this iteration, not the loop
+                        Flow::Normal(_) | Flow::Continue => {}
+                        Flow::Break => break,
+                        // a return has to keep going past the loop
+                        ret @ Flow::Return(_) => return Ok(ret),
+                    }
+                }
+                Ok(Flow::Normal(Value::Unit))
+            }
+
+            StmtKind::Break => Ok(Flow::Break),
+            StmtKind::Continue => Ok(Flow::Continue),
+
+            StmtKind::Return(value) => {
+                let value = match value {
+                    Some(expr) => self.eval_in(expr, scope)?,
+                    None => Value::Unit,
+                };
+                Ok(Flow::Return(value))
+            }
+
+            StmtKind::ForIn { .. } => Err(RuntimeError::new(
+                "for loops are not supported yet",
+                stmt.info.span,
+            )),
+        }
+    }
+
+    fn eval_if(&mut self, expr: &Expr, scope: &Rc<Scope>) -> Result<Flow> {
+        let ExprKind::If { cond, then, else_ } = &expr.kind else {
+            unreachable!("only called for an if expression");
+        };
+
+        let test = self.eval_in(cond, scope)?;
+        let branch = if as_bool(&test, cond.info.span)? {
+            Some(then)
+        } else {
+            else_.as_ref()
+        };
+
+        match branch {
+            // both arms are blocks, and an `else if` is another if
+            Some(branch) => match &branch.kind {
+                ExprKind::Block(block) => self.exec_block(block, scope),
+                ExprKind::If { .. } => self.eval_if(branch, scope),
+                _ => Ok(Flow::Normal(self.eval_in(branch, scope)?)),
+            },
+            // an if with no else is unit when the condition is false
+            None => Ok(Flow::Normal(Value::Unit)),
+        }
+    }
+
+    fn exec_assign(
+        &mut self,
+        target: &Expr,
+        op: Option<BinaryOp>,
+        value: &Expr,
+        scope: &Rc<Scope>,
+    ) -> Result<()> {
+        let ExprKind::Ident(name) = &target.kind else {
+            return Err(RuntimeError::new(
+                "only variables can be assigned to for now",
+                target.info.span,
+            ));
+        };
+
+        let new = self.eval_in(value, scope)?;
+        let new = match op {
+            // `x += 1` reads x, applies the operator, writes back
+            Some(op) => {
+                let current = scope.lookup(&name.value).ok_or_else(|| {
+                    RuntimeError::new(format!("`{}` is not defined", name.value), name.span)
+                })?;
+                binary(op, current, new, target.info.span)?
+            }
+            None => new,
+        };
+
+        if scope.assign(&name.value, new) {
+            Ok(())
+        } else {
+            Err(RuntimeError::new(
+                format!("`{}` is not defined", name.value),
+                name.span,
+            ))
+        }
     }
 }
 
