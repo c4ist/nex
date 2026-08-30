@@ -4,10 +4,10 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.10
+last_step = 4.11
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.11 (fuzz-lite: random token mutations must never panic the
-            parser, 10k iterations)
+next_step = 4.12 (benchmark parse throughput on a generated 10k-line file,
+            record the baseline here)
 
 Phase status
 ------------
@@ -15,7 +15,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.10 done)
+[~] Phase 4  Parser: statements & items   (4.1-4.11 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -191,6 +191,10 @@ Design notes
   itself, so both parse_module and an inline `mod { }` body can decide
   whether a non-item means "error" or "end of list". `mod foo { }` recurses
   through parse_item, so mods nest and `pub` works inside them.
+- parser fuzzing (4.11) mutates hello.nex and tour.nex 10k times each and
+  checks the parser never panics. A third test asserts non-empty input
+  always produces items or errors, which catches the parser stalling -
+  a plain no-panic check would not.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,
