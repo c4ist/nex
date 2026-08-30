@@ -178,6 +178,20 @@ fn continue_skips_to_the_next_iteration() {
 }
 
 #[test]
+fn jumps_from_value_context_if_and_blocks_reach_the_loop() {
+    let value = run(r#"
+        let mut i = 0;
+        while i < 4 {
+            i += 1;
+            let ignored = if i == 3 { { break; } } else { 0 };
+            i += 1;
+        }
+        i
+    "#);
+    assert_eq!(value, Value::Int(3));
+}
+
+#[test]
 fn loops_nest_and_break_only_leaves_the_inner_one() {
     let value = run(r#"
         let mut outer = 0;

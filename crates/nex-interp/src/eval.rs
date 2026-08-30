@@ -33,31 +33,34 @@ impl Interpreter {
 
     pub fn eval(&mut self, expr: &Expr) -> Result<Value> {
         let scope = Rc::clone(&self.globals);
-        self.eval_in(expr, &scope)
+        Ok(self.eval_in(expr, &scope)?.value())
     }
 
-    pub fn eval_in(&mut self, expr: &Expr, scope: &Rc<Scope>) -> Result<Value> {
+    pub fn eval_in(&mut self, expr: &Expr, scope: &Rc<Scope>) -> Result<Flow> {
         match &expr.kind {
-            ExprKind::Int(v) => Ok(Value::Int(*v)),
-            ExprKind::Float(v) => Ok(Value::Float(*v)),
-            ExprKind::Bool(v) => Ok(Value::Bool(*v)),
-            ExprKind::Str(s) => Ok(Value::str(s)),
-            ExprKind::Unit => Ok(Value::Unit),
+            ExprKind::Int(v) => Ok(Flow::Normal(Value::Int(*v))),
+            ExprKind::Float(v) => Ok(Flow::Normal(Value::Float(*v))),
+            ExprKind::Bool(v) => Ok(Flow::Normal(Value::Bool(*v))),
+            ExprKind::Str(s) => Ok(Flow::Normal(Value::str(s))),
+            ExprKind::Unit => Ok(Flow::Normal(Value::Unit)),
 
-            ExprKind::Ident(name) => scope.lookup(&name.value).ok_or_else(|| {
+            ExprKind::Ident(name) => scope.lookup(&name.value).map(Flow::Normal).ok_or_else(|| {
                 RuntimeError::new(format!("`{}` is not defined", name.value), name.span)
             }),
 
             ExprKind::Unary { op, operand } => {
-                let value = self.eval_in(operand, scope)?;
-                unary(op.value, value, expr.info.span)
+                let flow = self.eval_in(operand, scope)?;
+                match flow {
+                    Flow::Normal(value) => unary(op.value, value, expr.info.span).map(Flow::Normal),
+                    jump => Ok(jump),
+                }
             }
 
             ExprKind::Binary { op, lhs, rhs } => self.binary_expr(expr, op.value, lhs, rhs, scope),
 
-            ExprKind::Block(block) => Ok(self.exec_block(block, scope)?.value()),
+            ExprKind::Block(block) => self.exec_block(block, scope),
 
-            ExprKind::If { .. } => Ok(self.eval_if(expr, scope)?.value()),
+            ExprKind::If { .. } => self.eval_if(expr, scope),
 
             other => Err(RuntimeError::new(
                 format!("{} is not supported yet", describe(other)),
@@ -73,26 +76,37 @@ impl Interpreter {
         lhs: &Expr,
         rhs: &Expr,
         scope: &Rc<Scope>,
-    ) -> Result<Value> {
+    ) -> Result<Flow> {
         // `&&` and `||` short-circuit, so the right side only runs when the
         // left hasn't already decided the answer
         if matches!(op, BinaryOp::And | BinaryOp::Or) {
-            let left = self.eval_in(lhs, scope)?;
-            let left = as_bool(&left, lhs.info.span)?;
+            let left = match self.eval_in(lhs, scope)? {
+                Flow::Normal(value) => as_bool(&value, lhs.info.span)?,
+                jump => return Ok(jump),
+            };
             let decided = match op {
                 BinaryOp::And => !left,
                 _ => left,
             };
             if decided {
-                return Ok(Value::Bool(left));
+                return Ok(Flow::Normal(Value::Bool(left)));
             }
-            let right = self.eval_in(rhs, scope)?;
-            return Ok(Value::Bool(as_bool(&right, rhs.info.span)?));
+            let right = match self.eval_in(rhs, scope)? {
+                Flow::Normal(value) => as_bool(&value, rhs.info.span)?,
+                jump => return Ok(jump),
+            };
+            return Ok(Flow::Normal(Value::Bool(right)));
         }
 
-        let left = self.eval_in(lhs, scope)?;
-        let right = self.eval_in(rhs, scope)?;
-        binary(op, left, right, expr.info.span)
+        let left = match self.eval_in(lhs, scope)? {
+            Flow::Normal(value) => value,
+            jump => return Ok(jump),
+        };
+        let right = match self.eval_in(rhs, scope)? {
+            Flow::Normal(value) => value,
+            jump => return Ok(jump),
+        };
+        binary(op, left, right, expr.info.span).map(Flow::Normal)
     }
 }
 
@@ -123,25 +137,28 @@ impl Interpreter {
                 match &expr.kind {
                     ExprKind::Block(block) => self.exec_block(block, scope),
                     ExprKind::If { .. } => self.eval_if(expr, scope),
-                    _ => Ok(Flow::Normal(self.eval_in(expr, scope)?)),
+                    _ => self.eval_in(expr, scope),
                 }
             }
 
             StmtKind::Let { name, value, .. } => {
-                let value = self.eval_in(value, scope)?;
+                let value = match self.eval_in(value, scope)? {
+                    Flow::Normal(value) => value,
+                    jump => return Ok(jump),
+                };
                 scope.define(name.value.clone(), value);
                 Ok(Flow::Normal(Value::Unit))
             }
 
-            StmtKind::Assign { target, op, value } => {
-                self.exec_assign(target, *op, value, scope)?;
-                Ok(Flow::Normal(Value::Unit))
-            }
+            StmtKind::Assign { target, op, value } => self.exec_assign(target, *op, value, scope),
 
             StmtKind::While { cond, body } => {
                 loop {
-                    let test = self.eval_in(cond, scope)?;
-                    if !as_bool(&test, cond.info.span)? {
+                    let test = match self.eval_in(cond, scope)? {
+                        Flow::Normal(value) => as_bool(&value, cond.info.span)?,
+                        jump => return Ok(jump),
+                    };
+                    if !test {
                         break;
                     }
                     match self.exec_block(body, scope)? {
@@ -160,7 +177,10 @@ impl Interpreter {
 
             StmtKind::Return(value) => {
                 let value = match value {
-                    Some(expr) => self.eval_in(expr, scope)?,
+                    Some(expr) => match self.eval_in(expr, scope)? {
+                        Flow::Normal(value) => value,
+                        jump => return Ok(jump),
+                    },
                     None => Value::Unit,
                 };
                 Ok(Flow::Return(value))
@@ -178,19 +198,18 @@ impl Interpreter {
             unreachable!("only called for an if expression");
         };
 
-        let test = self.eval_in(cond, scope)?;
-        let branch = if as_bool(&test, cond.info.span)? {
-            Some(then)
-        } else {
-            else_.as_ref()
+        let test = match self.eval_in(cond, scope)? {
+            Flow::Normal(value) => as_bool(&value, cond.info.span)?,
+            jump => return Ok(jump),
         };
+        let branch = if test { Some(then) } else { else_.as_ref() };
 
         match branch {
             // both arms are blocks, and an `else if` is another if
             Some(branch) => match &branch.kind {
                 ExprKind::Block(block) => self.exec_block(block, scope),
                 ExprKind::If { .. } => self.eval_if(branch, scope),
-                _ => Ok(Flow::Normal(self.eval_in(branch, scope)?)),
+                _ => self.eval_in(branch, scope),
             },
             // an if with no else is unit when the condition is false
             None => Ok(Flow::Normal(Value::Unit)),
@@ -203,7 +222,7 @@ impl Interpreter {
         op: Option<BinaryOp>,
         value: &Expr,
         scope: &Rc<Scope>,
-    ) -> Result<()> {
+    ) -> Result<Flow> {
         let ExprKind::Ident(name) = &target.kind else {
             return Err(RuntimeError::new(
                 "only variables can be assigned to for now",
@@ -211,7 +230,10 @@ impl Interpreter {
             ));
         };
 
-        let new = self.eval_in(value, scope)?;
+        let new = match self.eval_in(value, scope)? {
+            Flow::Normal(value) => value,
+            jump => return Ok(jump),
+        };
         let new = match op {
             // `x += 1` reads x, applies the operator, writes back
             Some(op) => {
@@ -224,7 +246,7 @@ impl Interpreter {
         };
 
         if scope.assign(&name.value, new) {
-            Ok(())
+            Ok(Flow::Normal(Value::Unit))
         } else {
             Err(RuntimeError::new(
                 format!("`{}` is not defined", name.value),
