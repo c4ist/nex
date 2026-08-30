@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.7
+last_step = 4.8
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.8 (use / mod / pub items, paths only)
+next_step = 4.9 (full-file parse of examples/hello.nex, snapshot whole AST)
 
 Phase status
 ------------
@@ -14,7 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.7 done)
+[~] Phase 4  Parser: statements & items   (4.1-4.8 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
@@ -69,8 +69,9 @@ Design notes
 - ItemKind::Impl is a deliberate stub: just the target type's Ident, no method
   bodies. Real impls need Fn items nested inside plus the type system wired
   through, so this is intentionally left thin until later.
-- No visibility (`pub`) on any item yet - not asked for by this step; add it
-  when a step actually needs module-level exports to matter.
+- Item carries `is_pub` as of 4.8. Item::new is private by default and
+  Item::new_pub is the other constructor, which kept every existing caller
+  working. The pretty printer wraps a public item as `(pub (fn ...))`.
 - Module (module.rs) is the ast root: one parsed file's Vec<Item> plus its
   own NodeInfo. Added in 3.1 because the parser needs an entry-point return
   type; phase 2 didn't need it since nothing parsed a whole file yet.
@@ -185,6 +186,10 @@ Design notes
 - examples/tour.nex is now blocked by exactly two known gaps: the `const`
   item (plan step 7.11) and the path expression `Option::Some(x)`. Pinned
   by a test that fails once either is fixed.
+- use/mod/pub (4.8). parse_item() returns Option<Item> and reports nothing
+  itself, so both parse_module and an inline `mod { }` body can decide
+  whether a non-item means "error" or "end of list". `mod foo { }` recurses
+  through parse_item, so mods nest and `pub` works inside them.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

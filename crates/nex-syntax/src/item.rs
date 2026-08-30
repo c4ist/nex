@@ -8,12 +8,26 @@ use nex_lexer::Span;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Item {
     pub info: NodeInfo,
+    pub is_pub: bool,
     pub kind: ItemKind,
 }
 
 impl Item {
+    /// private, which is the default for everything without `pub`
     pub fn new(kind: ItemKind, info: NodeInfo) -> Self {
-        Item { info, kind }
+        Item {
+            info,
+            is_pub: false,
+            kind,
+        }
+    }
+
+    pub fn new_pub(kind: ItemKind, info: NodeInfo) -> Self {
+        Item {
+            info,
+            is_pub: true,
+            kind,
+        }
     }
 }
 

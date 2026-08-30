@@ -4,7 +4,7 @@
 //! anything that went wrong is in `errors()`.
 
 use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
-use crate::item::{Enum, FieldDef, Fn, Item, ItemKind, Param, Struct, Variant};
+use crate::item::{Enum, FieldDef, Fn, Item, ItemKind, Mod, Param, Struct, Use, Variant};
 use crate::module::Module;
 use crate::node::{Ident, NodeIdGen, NodeInfo, Spanned};
 use crate::pattern::{FieldPattern, Pattern, PatternKind};
@@ -1011,6 +1011,86 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// `use a::b::c;`
+    fn parse_use(&mut self) -> Item {
+        let use_tok = self.expect(TokenKind::Use);
+
+        let mut path = vec![self.expect_ident()];
+        while self.peek().kind == TokenKind::ColonColon {
+            self.advance();
+            path.push(self.expect_ident());
+        }
+
+        let semi = self.expect(TokenKind::Semi);
+        let span = use_tok.span.merge(semi.span);
+        let info = NodeInfo::new(self.ids.fresh(), span);
+        self.item(ItemKind::Use(Use::new(path, info)), span)
+    }
+
+    /// `mod foo;` for a separate file, or `mod foo { .. }` inline.
+    fn parse_mod(&mut self) -> Item {
+        let mod_tok = self.expect(TokenKind::Mod);
+        let name = self.expect_ident();
+
+        if self.peek().kind == TokenKind::LBrace {
+            self.advance();
+            let mut items = Vec::new();
+            while !matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
+                match self.parse_item() {
+                    Some(item) => items.push(item),
+                    None => {
+                        self.advance();
+                    }
+                }
+            }
+            let close = self.expect(TokenKind::RBrace);
+            let span = mod_tok.span.merge(close.span);
+            let info = NodeInfo::new(self.ids.fresh(), span);
+            return self.item(ItemKind::Mod(Mod::new(name, Some(items), info)), span);
+        }
+
+        let semi = self.expect(TokenKind::Semi);
+        let span = mod_tok.span.merge(semi.span);
+        let info = NodeInfo::new(self.ids.fresh(), span);
+        self.item(ItemKind::Mod(Mod::new(name, None, info)), span)
+    }
+
+    /// one item, or `None` if the current token can't start one. reports
+    /// nothing: the caller decides whether that's an error or a loop end.
+    fn parse_item(&mut self) -> Option<Item> {
+        let is_pub = self.peek().kind == TokenKind::Pub;
+        if is_pub {
+            self.advance();
+        }
+
+        let item = match self.peek().kind {
+            TokenKind::Fn => self.parse_fn(),
+            TokenKind::Struct => self.parse_struct(),
+            TokenKind::Enum => self.parse_enum(),
+            TokenKind::Use => self.parse_use(),
+            TokenKind::Mod => self.parse_mod(),
+            _ => {
+                if is_pub {
+                    let tok = self.peek().clone();
+                    self.errors.push(ParseError::new(
+                        format!(
+                            "expected an item after `pub`, found {}",
+                            tok.kind.describe()
+                        ),
+                        tok.span,
+                    ));
+                }
+                return None;
+            }
+        };
+
+        Some(if is_pub {
+            Item::new_pub(item.kind, item.info)
+        } else {
+            item
+        })
+    }
+
     /// `<T, U>`, or nothing. bare names only; nex has no bounds.
     fn parse_generics(&mut self) -> Vec<Ident> {
         if self.peek().kind != TokenKind::Lt {
@@ -1027,32 +1107,20 @@ impl<'a> Parser<'a> {
         Item::new(kind, NodeInfo::new(self.ids.fresh(), span))
     }
 
-    /// `fn`, `struct` and `enum` items; `use`, `mod` and `impl` follow.
     pub fn parse_module(&mut self) -> Module {
         let mut items = Vec::new();
         while !self.at_eof() {
-            match self.peek().kind {
-                TokenKind::Fn => {
-                    items.push(self.parse_fn());
-                    continue;
+            match self.parse_item() {
+                Some(item) => items.push(item),
+                None => {
+                    let tok = self.peek().clone();
+                    self.errors.push(ParseError::new(
+                        format!("expected an item, found {}", tok.kind.describe()),
+                        tok.span,
+                    ));
+                    self.advance();
                 }
-                TokenKind::Struct => {
-                    items.push(self.parse_struct());
-                    continue;
-                }
-                TokenKind::Enum => {
-                    items.push(self.parse_enum());
-                    continue;
-                }
-                _ => {}
             }
-
-            let tok = self.peek().clone();
-            self.errors.push(ParseError::new(
-                format!("expected an item, found {}", tok.kind.describe()),
-                tok.span,
-            ));
-            self.advance();
         }
         let span = self.peek().span;
         Module::new(items, NodeInfo::new(self.ids.fresh(), span))

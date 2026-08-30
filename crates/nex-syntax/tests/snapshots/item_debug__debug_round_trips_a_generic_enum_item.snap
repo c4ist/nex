@@ -5,6 +5,7 @@ snapshot_kind: text
 ---
 Item {
     info: #4@0..33,
+    is_pub: false,
     kind: Enum(
         Enum {
             info: #3@16..33,

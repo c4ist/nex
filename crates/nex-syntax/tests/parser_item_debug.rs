@@ -236,3 +236,77 @@ fn the_tour_example_is_blocked_only_by_known_gaps() {
         "expected the path-expression gap, got {errors:?}"
     );
 }
+
+// use, mod, pub
+
+#[test]
+fn parses_a_use_path() {
+    assert_eq!(items("use a::b::c;"), ["(use a::b::c)"]);
+    assert_eq!(items("use foo;"), ["(use foo)"]);
+}
+
+#[test]
+fn parses_an_external_mod() {
+    assert_eq!(items("mod foo;"), ["(mod foo)"]);
+}
+
+#[test]
+fn parses_an_inline_mod_with_items() {
+    assert_eq!(
+        items("mod foo { fn a() {} }"),
+        ["(mod foo (fn a () () () (block)))"]
+    );
+}
+
+#[test]
+fn parses_an_empty_inline_mod() {
+    assert_eq!(items("mod foo { }"), ["(mod foo)"]);
+}
+
+#[test]
+fn mods_nest() {
+    assert_eq!(
+        items("mod a { mod b { fn c() {} } }"),
+        ["(mod a (mod b (fn c () () () (block))))"]
+    );
+}
+
+#[test]
+fn parses_pub_on_every_item_kind() {
+    assert_eq!(items("pub fn f() {}"), ["(pub (fn f () () () (block)))"]);
+    assert_eq!(items("pub struct S {}"), ["(pub (struct S () ()))"]);
+    assert_eq!(items("pub enum E {}"), ["(pub (enum E () ()))"]);
+    assert_eq!(items("pub use a::b;"), ["(pub (use a::b))"]);
+    assert_eq!(items("pub mod m;"), ["(pub (mod m))"]);
+}
+
+#[test]
+fn items_are_private_without_pub() {
+    assert_eq!(items("fn f() {}"), ["(fn f () () () (block))"]);
+}
+
+#[test]
+fn pub_works_on_items_inside_a_mod() {
+    assert_eq!(
+        items("mod m { pub fn f() {} }"),
+        ["(mod m (pub (fn f () () () (block))))"]
+    );
+}
+
+#[test]
+fn a_use_without_a_semicolon_reports_an_error() {
+    let (_, errors) = parse("use a::b");
+    assert_eq!(errors, vec!["expected `;`, found end of file"]);
+}
+
+#[test]
+fn pub_on_something_that_is_not_an_item_reports_an_error() {
+    let (_, errors) = parse("pub let x = 1;");
+    assert_eq!(errors[0], "expected an item after `pub`, found `let`");
+}
+
+#[test]
+fn an_unclosed_inline_mod_reports_an_error_without_hanging() {
+    let (_, errors) = parse("mod m { fn f() {}");
+    assert_eq!(errors, vec!["expected `}`, found end of file"]);
+}

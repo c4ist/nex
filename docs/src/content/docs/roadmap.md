@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 4.7
+- **last step:** 4.8
 - **current phase:** 4 (parser: statements and items)
-- **next step:** 4.8, `use` / `mod` / `pub` items
+- **next step:** 4.9, whole-file AST snapshot
 
 ## Phase status
 

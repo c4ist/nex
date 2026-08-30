@@ -136,7 +136,7 @@ fn debug_round_trips_a_use_item() {
     );
     assert_eq!(
         format!("{item:?}"),
-        "Item { info: #1@0..12, kind: Use(Use { info: #0@4..11, path: [\"a\"@4..5, \"b\"@7..8, \"c\"@10..11] }) }"
+        "Item { info: #1@0..12, is_pub: false, kind: Use(Use { info: #0@4..11, path: [\"a\"@4..5, \"b\"@7..8, \"c\"@10..11] }) }"
     );
 }
 
@@ -154,7 +154,7 @@ fn debug_round_trips_mod_items_external_and_inline() {
     );
     assert_eq!(
         format!("{external:?}"),
-        "Item { info: #1@0..8, kind: Mod(Mod { info: #0@4..7, name: \"foo\"@4..7, items: None }) }"
+        "Item { info: #1@0..8, is_pub: false, kind: Mod(Mod { info: #0@4..7, name: \"foo\"@4..7, items: None }) }"
     );
 
     let inline = Item::new(
@@ -167,7 +167,7 @@ fn debug_round_trips_mod_items_external_and_inline() {
     );
     assert_eq!(
         format!("{inline:?}"),
-        "Item { info: #3@0..11, kind: Mod(Mod { info: #2@4..11, name: \"foo\"@4..7, items: Some([]) }) }"
+        "Item { info: #3@0..11, is_pub: false, kind: Mod(Mod { info: #2@4..11, name: \"foo\"@4..7, items: Some([]) }) }"
     );
 }
 
@@ -184,6 +184,6 @@ fn debug_round_trips_an_impl_stub() {
     );
     assert_eq!(
         format!("{item:?}"),
-        "Item { info: #1@0..14, kind: Impl(Impl { info: #0@5..10, target: \"Point\"@5..10 }) }"
+        "Item { info: #1@0..14, is_pub: false, kind: Impl(Impl { info: #0@5..10, target: \"Point\"@5..10 }) }"
     );
 }

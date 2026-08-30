@@ -5,6 +5,7 @@ snapshot_kind: text
 ---
 Item {
     info: #9@0..37,
+    is_pub: false,
     kind: Fn(
         Fn {
             info: #8@22..37,

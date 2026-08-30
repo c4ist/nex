@@ -224,6 +224,15 @@ fn print_field_pattern(field: &FieldPattern) -> String {
 }
 
 pub fn print_item(item: &Item) -> String {
+    let printed = print_item_kind(item);
+    if item.is_pub {
+        sexp("pub", &[printed])
+    } else {
+        printed
+    }
+}
+
+fn print_item_kind(item: &Item) -> String {
     match &item.kind {
         ItemKind::Fn(f) => print_fn(f),
         ItemKind::Struct(s) => print_struct(s),
