@@ -199,6 +199,31 @@ impl<'a> Parser<'a> {
         out
     }
 
+    /// parses `element` repeatedly until `closer`, separated by commas, with
+    /// a trailing comma allowed. does not consume the closer.
+    ///
+    /// stops at `Eof` too: `element` may not consume anything there, and the
+    /// loop would spin.
+    fn comma_separated<T>(
+        &mut self,
+        closer: TokenKind,
+        mut element: impl FnMut(&mut Self) -> T,
+    ) -> Vec<T> {
+        let mut items = Vec::new();
+        loop {
+            if self.peek().kind == closer || self.at_eof() {
+                break;
+            }
+            items.push(element(self));
+            if self.peek().kind == TokenKind::Comma {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        items
+    }
+
     /// skips to the next statement boundary after a bad statement, so one
     /// mistake doesn't produce an error for every token after it.
     fn synchronize(&mut self) {
@@ -329,19 +354,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_call_args(&mut self) -> Vec<Expr> {
-        let mut args = Vec::new();
-        loop {
-            if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
-                break;
-            }
-            args.push(self.with_struct_literals(|p| p.parse_expr()));
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
-        args
+        self.comma_separated(TokenKind::RParen, |p| {
+            p.with_struct_literals(|p| p.parse_expr())
+        })
     }
 
     fn parse_leaf(&mut self) -> Expr {
@@ -448,28 +463,13 @@ impl<'a> Parser<'a> {
             );
         }
 
-        let mut arms = Vec::new();
-        loop {
-            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
-                break;
-            }
-
-            let pattern = self.parse_pattern();
-            self.expect(TokenKind::FatArrow);
-            let body = self.with_struct_literals(|p| p.parse_expr());
+        let arms = self.comma_separated(TokenKind::RBrace, |p| {
+            let pattern = p.parse_pattern();
+            p.expect(TokenKind::FatArrow);
+            let body = p.with_struct_literals(|p| p.parse_expr());
             let span = pattern.info.span.merge(body.info.span);
-            arms.push(MatchArm::new(
-                pattern,
-                body,
-                NodeInfo::new(self.ids.fresh(), span),
-            ));
-
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+            MatchArm::new(pattern, body, NodeInfo::new(p.ids.fresh(), span))
+        });
 
         let close = self.expect(TokenKind::RBrace);
         let span = match_tok.span.merge(close.span);
@@ -546,18 +546,7 @@ impl<'a> Parser<'a> {
 
     fn parse_tuple_pattern(&mut self) -> Pattern {
         let open = self.expect(TokenKind::LParen);
-        let mut elems = Vec::new();
-        loop {
-            if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
-                break;
-            }
-            elems.push(self.parse_pattern());
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+        let elems = self.comma_separated(TokenKind::RParen, |p| p.parse_pattern());
         let close = self.expect(TokenKind::RParen);
         self.pattern(PatternKind::Tuple(elems), open.span.merge(close.span))
     }
@@ -581,44 +570,20 @@ impl<'a> Parser<'a> {
         match self.peek().kind {
             TokenKind::LParen => {
                 self.advance();
-                let mut fields = Vec::new();
-                loop {
-                    if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
-                        break;
-                    }
-                    fields.push(self.parse_pattern());
-                    if self.peek().kind == TokenKind::Comma {
-                        self.advance();
-                    } else {
-                        break;
-                    }
-                }
+                let fields = self.comma_separated(TokenKind::RParen, |p| p.parse_pattern());
                 let close = self.expect(TokenKind::RParen);
                 let span = path[0].span.merge(close.span);
                 self.pattern(PatternKind::EnumVariant { path, fields }, span)
             }
             TokenKind::LBrace if path.len() == 1 => {
                 self.advance();
-                let mut fields = Vec::new();
-                loop {
-                    if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
-                        break;
-                    }
-                    let name = self.expect_ident();
-                    self.expect(TokenKind::Colon);
-                    let pat = self.parse_pattern();
+                let fields = self.comma_separated(TokenKind::RBrace, |p| {
+                    let name = p.expect_ident();
+                    p.expect(TokenKind::Colon);
+                    let pat = p.parse_pattern();
                     let span = name.span.merge(pat.info.span);
-                    fields.push(FieldPattern::new(
-                        name,
-                        pat,
-                        NodeInfo::new(self.ids.fresh(), span),
-                    ));
-                    if self.peek().kind == TokenKind::Comma {
-                        self.advance();
-                    } else {
-                        break;
-                    }
-                }
+                    FieldPattern::new(name, pat, NodeInfo::new(p.ids.fresh(), span))
+                });
                 let close = self.expect(TokenKind::RBrace);
                 let name = path.remove(0);
                 let span = name.span.merge(close.span);
@@ -647,29 +612,13 @@ impl<'a> Parser<'a> {
     fn parse_struct_literal(&mut self) -> Expr {
         let name = self.expect_ident();
         self.expect(TokenKind::LBrace);
-        let mut fields = Vec::new();
-
-        loop {
-            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
-                break;
-            }
-
-            let field_name = self.expect_ident();
-            self.expect(TokenKind::Colon);
-            let value = self.with_struct_literals(|p| p.parse_expr());
+        let fields = self.comma_separated(TokenKind::RBrace, |p| {
+            let field_name = p.expect_ident();
+            p.expect(TokenKind::Colon);
+            let value = p.with_struct_literals(|p| p.parse_expr());
             let span = field_name.span.merge(value.info.span);
-            fields.push(FieldInit::new(
-                field_name,
-                value,
-                NodeInfo::new(self.ids.fresh(), span),
-            ));
-
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+            FieldInit::new(field_name, value, NodeInfo::new(p.ids.fresh(), span))
+        });
 
         let close = self.expect(TokenKind::RBrace);
         let span = name.span.merge(close.span);
@@ -784,18 +733,7 @@ impl<'a> Parser<'a> {
             TokenKind::Fn => {
                 self.advance();
                 self.expect(TokenKind::LParen);
-                let mut params = Vec::new();
-                loop {
-                    if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
-                        break;
-                    }
-                    params.push(self.parse_type());
-                    if self.peek().kind == TokenKind::Comma {
-                        self.advance();
-                    } else {
-                        break;
-                    }
-                }
+                let params = self.comma_separated(TokenKind::RParen, |p| p.parse_type());
                 let close = self.expect(TokenKind::RParen);
                 let mut span = tok.span.merge(close.span);
                 let return_type = if self.peek().kind == TokenKind::Arrow {
@@ -820,17 +758,7 @@ impl<'a> Parser<'a> {
                 let mut args = Vec::new();
                 if self.peek().kind == TokenKind::Lt {
                     self.advance();
-                    loop {
-                        if matches!(self.peek().kind, TokenKind::Gt | TokenKind::Eof) {
-                            break;
-                        }
-                        args.push(self.parse_type());
-                        if self.peek().kind == TokenKind::Comma {
-                            self.advance();
-                        } else {
-                            break;
-                        }
-                    }
+                    args = self.comma_separated(TokenKind::Gt, |p| p.parse_type());
                     let close = self.expect(TokenKind::Gt);
                     span = span.merge(close.span);
                 }
@@ -864,6 +792,17 @@ impl<'a> Parser<'a> {
                     NodeInfo::dummy(tok.span),
                 )
             }
+        }
+    }
+
+    /// the `: Type` on a parameter or field. a missing `:` means no type
+    /// follows, so asking for one would report the same mistake twice.
+    fn parse_annotation(&mut self) -> Type {
+        let colon = self.expect(TokenKind::Colon);
+        if colon.kind == TokenKind::Colon {
+            self.parse_type()
+        } else {
+            self.missing_type(colon.span)
         }
     }
 
@@ -975,30 +914,12 @@ impl<'a> Parser<'a> {
         let generics = self.parse_generics();
 
         self.expect(TokenKind::LParen);
-        let mut params = Vec::new();
-        loop {
-            if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
-                break;
-            }
-            let param_name = self.expect_ident();
-            let colon = self.expect(TokenKind::Colon);
-            let ty = if colon.kind == TokenKind::Colon {
-                self.parse_type()
-            } else {
-                self.missing_type(colon.span)
-            };
+        let params = self.comma_separated(TokenKind::RParen, |p| {
+            let param_name = p.expect_ident();
+            let ty = p.parse_annotation();
             let span = param_name.span.merge(ty.info.span);
-            params.push(Param::new(
-                param_name,
-                ty,
-                NodeInfo::new(self.ids.fresh(), span),
-            ));
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+            Param::new(param_name, ty, NodeInfo::new(p.ids.fresh(), span))
+        });
         self.expect(TokenKind::RParen);
 
         let return_type = if self.peek().kind == TokenKind::Arrow {
@@ -1033,32 +954,12 @@ impl<'a> Parser<'a> {
             );
         }
 
-        let mut fields = Vec::new();
-        loop {
-            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
-                break;
-            }
-            let field_name = self.expect_ident();
-            // no `:` means no type follows; asking for one would report the
-            // same mistake twice
-            let colon = self.expect(TokenKind::Colon);
-            let ty = if colon.kind == TokenKind::Colon {
-                self.parse_type()
-            } else {
-                self.missing_type(colon.span)
-            };
+        let fields = self.comma_separated(TokenKind::RBrace, |p| {
+            let field_name = p.expect_ident();
+            let ty = p.parse_annotation();
             let span = field_name.span.merge(ty.info.span);
-            fields.push(FieldDef::new(
-                field_name,
-                ty,
-                NodeInfo::new(self.ids.fresh(), span),
-            ));
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+            FieldDef::new(field_name, ty, NodeInfo::new(p.ids.fresh(), span))
+        });
 
         let close = self.expect(TokenKind::RBrace);
         let span = struct_tok.span.merge(close.span);
@@ -1086,45 +987,20 @@ impl<'a> Parser<'a> {
             );
         }
 
-        let mut variants = Vec::new();
-        loop {
-            if matches!(self.peek().kind, TokenKind::RBrace | TokenKind::Eof) {
-                break;
-            }
-
-            let variant_name = self.expect_ident();
+        let variants = self.comma_separated(TokenKind::RBrace, |p| {
+            let variant_name = p.expect_ident();
             let mut span = variant_name.span;
             let mut payload = Vec::new();
 
-            if self.peek().kind == TokenKind::LParen {
-                self.advance();
-                loop {
-                    if matches!(self.peek().kind, TokenKind::RParen | TokenKind::Eof) {
-                        break;
-                    }
-                    payload.push(self.parse_type());
-                    if self.peek().kind == TokenKind::Comma {
-                        self.advance();
-                    } else {
-                        break;
-                    }
-                }
-                let close = self.expect(TokenKind::RParen);
+            if p.peek().kind == TokenKind::LParen {
+                p.advance();
+                payload = p.comma_separated(TokenKind::RParen, |p| p.parse_type());
+                let close = p.expect(TokenKind::RParen);
                 span = span.merge(close.span);
             }
 
-            variants.push(Variant::new(
-                variant_name,
-                payload,
-                NodeInfo::new(self.ids.fresh(), span),
-            ));
-
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+            Variant::new(variant_name, payload, NodeInfo::new(p.ids.fresh(), span))
+        });
 
         let close = self.expect(TokenKind::RBrace);
         let span = enum_tok.span.merge(close.span);
@@ -1142,18 +1018,7 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
-        let mut generics = Vec::new();
-        loop {
-            if matches!(self.peek().kind, TokenKind::Gt | TokenKind::Eof) {
-                break;
-            }
-            generics.push(self.expect_ident());
-            if self.peek().kind == TokenKind::Comma {
-                self.advance();
-            } else {
-                break;
-            }
-        }
+        let generics = self.comma_separated(TokenKind::Gt, |p| p.expect_ident());
         self.expect(TokenKind::Gt);
         generics
     }
