@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 5.1
+- **last step:** 5.2
 - **current phase:** 5 (tree-walking interpreter)
-- **next step:** 5.2, lexical scopes
+- **next step:** 5.3, evaluating literals and operators
 
 ## Phase status
 

@@ -4,10 +4,10 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.1
+last_step = 5.2
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.2 (Environment with lexical scopes: push/pop, define, assign,
-            lookup)
+next_step = 5.3 (evaluate literals, identifiers, unary/binary ops on ints
+            and bools)
 
 Phase status
 ------------
@@ -16,7 +16,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.2 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -210,6 +210,11 @@ Design notes
   so they stay distinguishable from ints. Debug quotes strings instead.
 - Fn values compare by Rc identity. Comparing bodies would be surprising
   and comparing names would be wrong.
+- Scope (5.2) is a linked chain rather than a stack of frames: each holds
+  an Rc to its parent, so a closure capturing a scope keeps it alive after
+  the call that made it returns. define() shadows, assign() walks outwards
+  to the nearest existing binding and fails if there is none - creating
+  bindings is `let`'s job, not assignment's.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,
