@@ -4,10 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.2
+last_step = 5.3
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.3 (evaluate literals, identifiers, unary/binary ops on ints
-            and bools)
+next_step = 5.4 (floats, string concatenation, comparison operators)
 
 Phase status
 ------------
@@ -16,7 +15,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.2 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.3 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -215,6 +214,17 @@ Design notes
   the call that made it returns. define() shadows, assign() walks outwards
   to the nearest existing binding and fails if there is none - creating
   bindings is `let`'s job, not assignment's.
+- eval (5.3) covers literals, identifiers and operators. Integer
+  arithmetic is CHECKED: overflow, division by zero and out-of-range
+  shifts are runtime errors rather than wrapping or panicking. Floats
+  follow ieee, so 1.0/0.0 is infinity - only integers error there.
+- No implicit conversions anywhere: `1 + 1.0` and `1 == 1.0` are both
+  errors, and only Bool is accepted as a condition.
+- `&&` and `||` short-circuit, so `false && undefined` is false rather
+  than an undefined-name error.
+- Step 5.4 (floats, string concat, comparisons) is already covered by
+  5.3's implementation and tests; it needs confirming rather than
+  writing.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,

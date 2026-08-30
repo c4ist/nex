@@ -1,0 +1,257 @@
+//! expression evaluation.
+
+use std::rc::Rc;
+
+use nex_lexer::Span;
+use nex_syntax::{BinaryOp, Expr, ExprKind, UnaryOp};
+
+use crate::env::Scope;
+use crate::error::{Result, RuntimeError};
+use crate::value::Value;
+
+pub struct Interpreter {
+    globals: Rc<Scope>,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Interpreter::new()
+    }
+}
+
+impl Interpreter {
+    pub fn new() -> Self {
+        Interpreter {
+            globals: Scope::global(),
+        }
+    }
+
+    pub fn globals(&self) -> &Rc<Scope> {
+        &self.globals
+    }
+
+    pub fn eval(&mut self, expr: &Expr) -> Result<Value> {
+        let scope = Rc::clone(&self.globals);
+        self.eval_in(expr, &scope)
+    }
+
+    pub fn eval_in(&mut self, expr: &Expr, scope: &Rc<Scope>) -> Result<Value> {
+        match &expr.kind {
+            ExprKind::Int(v) => Ok(Value::Int(*v)),
+            ExprKind::Float(v) => Ok(Value::Float(*v)),
+            ExprKind::Bool(v) => Ok(Value::Bool(*v)),
+            ExprKind::Str(s) => Ok(Value::str(s)),
+            ExprKind::Unit => Ok(Value::Unit),
+
+            ExprKind::Ident(name) => scope.lookup(&name.value).ok_or_else(|| {
+                RuntimeError::new(format!("`{}` is not defined", name.value), name.span)
+            }),
+
+            ExprKind::Unary { op, operand } => {
+                let value = self.eval_in(operand, scope)?;
+                unary(op.value, value, expr.info.span)
+            }
+
+            ExprKind::Binary { op, lhs, rhs } => self.binary_expr(expr, op.value, lhs, rhs, scope),
+
+            other => Err(RuntimeError::new(
+                format!("{} is not supported yet", describe(other)),
+                expr.info.span,
+            )),
+        }
+    }
+
+    fn binary_expr(
+        &mut self,
+        expr: &Expr,
+        op: BinaryOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        scope: &Rc<Scope>,
+    ) -> Result<Value> {
+        // `&&` and `||` short-circuit, so the right side only runs when the
+        // left hasn't already decided the answer
+        if matches!(op, BinaryOp::And | BinaryOp::Or) {
+            let left = self.eval_in(lhs, scope)?;
+            let left = as_bool(&left, lhs.info.span)?;
+            let decided = match op {
+                BinaryOp::And => !left,
+                _ => left,
+            };
+            if decided {
+                return Ok(Value::Bool(left));
+            }
+            let right = self.eval_in(rhs, scope)?;
+            return Ok(Value::Bool(as_bool(&right, rhs.info.span)?));
+        }
+
+        let left = self.eval_in(lhs, scope)?;
+        let right = self.eval_in(rhs, scope)?;
+        binary(op, left, right, expr.info.span)
+    }
+}
+
+fn describe(kind: &ExprKind) -> &'static str {
+    match kind {
+        ExprKind::Call { .. } => "calling a function",
+        ExprKind::Field { .. } => "field access",
+        ExprKind::Index { .. } => "indexing",
+        ExprKind::StructLit { .. } => "a struct literal",
+        ExprKind::If { .. } => "an if expression",
+        ExprKind::Block(_) => "a block",
+        ExprKind::Match { .. } => "a match expression",
+        ExprKind::Range { .. } => "a range",
+        _ => "this expression",
+    }
+}
+
+fn as_bool(value: &Value, span: Span) -> Result<bool> {
+    value.as_bool().ok_or_else(|| {
+        RuntimeError::new(format!("expected bool, found {}", value.type_name()), span)
+    })
+}
+
+fn unary(op: UnaryOp, value: Value, span: Span) -> Result<Value> {
+    match (op, &value) {
+        (UnaryOp::Neg, Value::Int(v)) => v
+            .checked_neg()
+            .map(Value::Int)
+            .ok_or_else(|| RuntimeError::new("integer overflow", span)),
+        (UnaryOp::Neg, Value::Float(v)) => Ok(Value::Float(-v)),
+        (UnaryOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
+        _ => Err(RuntimeError::new(
+            format!(
+                "cannot apply `{}` to {}",
+                match op {
+                    UnaryOp::Neg => "-",
+                    UnaryOp::Not => "!",
+                },
+                value.type_name()
+            ),
+            span,
+        )),
+    }
+}
+
+fn binary(op: BinaryOp, left: Value, right: Value, span: Span) -> Result<Value> {
+    use BinaryOp::*;
+
+    // equality works on any two values, as long as they're the same type
+    if matches!(op, Eq | Ne) {
+        if left.type_name() != right.type_name() {
+            return Err(unsupported(op, &left, &right, span));
+        }
+        let equal = left == right;
+        return Ok(Value::Bool(if op == Eq { equal } else { !equal }));
+    }
+
+    match (&left, &right) {
+        (Value::Int(a), Value::Int(b)) => int_op(op, *a, *b, span),
+        (Value::Float(a), Value::Float(b)) => float_op(op, *a, *b, span),
+        (Value::Str(a), Value::Str(b)) => match op {
+            Add => Ok(Value::str(format!("{a}{b}"))),
+            Lt => Ok(Value::Bool(a < b)),
+            Le => Ok(Value::Bool(a <= b)),
+            Gt => Ok(Value::Bool(a > b)),
+            Ge => Ok(Value::Bool(a >= b)),
+            _ => Err(unsupported(op, &left, &right, span)),
+        },
+        _ => Err(unsupported(op, &left, &right, span)),
+    }
+}
+
+fn unsupported(op: BinaryOp, left: &Value, right: &Value, span: Span) -> RuntimeError {
+    RuntimeError::new(
+        format!(
+            "cannot apply `{}` to {} and {}",
+            op_str(op),
+            left.type_name(),
+            right.type_name()
+        ),
+        span,
+    )
+}
+
+fn op_str(op: BinaryOp) -> &'static str {
+    use BinaryOp::*;
+    match op {
+        Or => "||",
+        And => "&&",
+        Eq => "==",
+        Ne => "!=",
+        Lt => "<",
+        Le => "<=",
+        Gt => ">",
+        Ge => ">=",
+        BitOr => "|",
+        BitXor => "^",
+        BitAnd => "&",
+        Shl => "<<",
+        Shr => ">>",
+        Add => "+",
+        Sub => "-",
+        Mul => "*",
+        Div => "/",
+        Rem => "%",
+    }
+}
+
+fn int_op(op: BinaryOp, a: i64, b: i64, span: Span) -> Result<Value> {
+    use BinaryOp::*;
+
+    // arithmetic is checked; wrapping silently is a worse default than an
+    // error the programmer can see
+    let checked = |v: Option<i64>| {
+        v.map(Value::Int)
+            .ok_or_else(|| RuntimeError::new("integer overflow", span))
+    };
+
+    match op {
+        Add => checked(a.checked_add(b)),
+        Sub => checked(a.checked_sub(b)),
+        Mul => checked(a.checked_mul(b)),
+        Div if b == 0 => Err(RuntimeError::new("division by zero", span)),
+        Div => checked(a.checked_div(b)),
+        Rem if b == 0 => Err(RuntimeError::new("remainder by zero", span)),
+        Rem => checked(a.checked_rem(b)),
+        BitAnd => Ok(Value::Int(a & b)),
+        BitOr => Ok(Value::Int(a | b)),
+        BitXor => Ok(Value::Int(a ^ b)),
+        // shifting by more than the width is undefined in C and panics in
+        // rust; here it's a plain runtime error
+        Shl | Shr => {
+            let bits = u32::try_from(b)
+                .ok()
+                .filter(|bits| *bits < i64::BITS)
+                .ok_or_else(|| {
+                    RuntimeError::new(format!("shift amount {b} is out of range"), span)
+                })?;
+            Ok(Value::Int(if op == Shl { a << bits } else { a >> bits }))
+        }
+        Lt => Ok(Value::Bool(a < b)),
+        Le => Ok(Value::Bool(a <= b)),
+        Gt => Ok(Value::Bool(a > b)),
+        Ge => Ok(Value::Bool(a >= b)),
+        Eq | Ne | And | Or => unreachable!("handled before dispatch"),
+    }
+}
+
+fn float_op(op: BinaryOp, a: f64, b: f64, span: Span) -> Result<Value> {
+    use BinaryOp::*;
+    match op {
+        Add => Ok(Value::Float(a + b)),
+        Sub => Ok(Value::Float(a - b)),
+        Mul => Ok(Value::Float(a * b)),
+        Div => Ok(Value::Float(a / b)),
+        Rem => Ok(Value::Float(a % b)),
+        Lt => Ok(Value::Bool(a < b)),
+        Le => Ok(Value::Bool(a <= b)),
+        Gt => Ok(Value::Bool(a > b)),
+        Ge => Ok(Value::Bool(a >= b)),
+        BitAnd | BitOr | BitXor | Shl | Shr => Err(RuntimeError::new(
+            format!("cannot apply `{}` to f64 and f64", op_str(op)),
+            span,
+        )),
+        Eq | Ne | And | Or => unreachable!("handled before dispatch"),
+    }
+}
