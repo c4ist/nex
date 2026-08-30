@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 4.8
+last_step = 4.9
 current_phase = 4 (Parser: statements & items) - in progress
-next_step = 4.9 (full-file parse of examples/hello.nex, snapshot whole AST)
+next_step = 4.10 (nex parse <file> dev subcommand printing the s-expr AST)
 
 Phase status
 ------------
@@ -14,7 +14,7 @@ Phase status
 [x] Phase 1  Lexer
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
-[~] Phase 4  Parser: statements & items   (4.1-4.8 done)
+[~] Phase 4  Parser: statements & items   (4.1-4.9 done)
 [ ] Phase 5  Tree-walk interpreter
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2

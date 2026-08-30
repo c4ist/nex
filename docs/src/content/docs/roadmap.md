@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 4.8
+- **last step:** 4.9
 - **current phase:** 4 (parser: statements and items)
-- **next step:** 4.9, whole-file AST snapshot
+- **next step:** 4.10, a `nex parse` subcommand
 
 ## Phase status
 

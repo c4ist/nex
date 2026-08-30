@@ -1,0 +1,6 @@
+---
+source: crates/nex-syntax/tests/golden_ast.rs
+expression: "parse_file(include_str!(\"../../../examples/hello.nex\"))"
+snapshot_kind: text
+---
+(fn main () () () (block (call print "hello, world")))
