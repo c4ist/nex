@@ -3,8 +3,8 @@ title: Compiler Architecture
 description: Workspace layout and the design decisions already locked in.
 ---
 
-The lexer and the expression parser work. Statement and item parsing, name
-resolution, type checking and codegen are still to come.
+The lexer and parser work: `nex parse` turns a source file into a syntax tree.
+Name resolution, type checking and codegen are still to come.
 
 ## Workspace layout
 
@@ -25,7 +25,7 @@ source text
    │  nex-lexer                        done
    ▼
 tokens
-   │  nex-syntax parser                expressions done
+   │  nex-syntax parser                done
    ▼
 AST (immutable)
    │  name resolution + type checker   planned
@@ -85,14 +85,16 @@ field access tighter still, and ranges looser than all of it.
 One thing to know when reading it: `advance()` is a no-op at `Eof`, so any loop
 over tokens needs its own `Eof` case or it will spin.
 
-`parse_module()` is the entry point. Item parsing isn't written yet, so it
-handles an empty file and reports an error per leftover token otherwise.
+`parse_module()` is the entry point, and `parse_item()` handles `fn`, `struct`,
+`enum`, `use` and `mod`, each optionally `pub`. An inline `mod { }` body goes
+back through `parse_item`, so modules nest.
 
 ## The CLI
 
-`nex` is built on clap. All six subcommands exist (`build`, `run`, `check`,
-`fmt`, `test`, `lex`) but only `lex` does anything; the rest exit with a message
-naming the phase that delivers them.
+`nex` is built on clap. `lex` dumps the token stream and `parse` dumps the
+syntax tree as s-expressions; both are development aids. `build`, `run`,
+`check`, `fmt` and `test` exist but exit with a message naming the phase that
+delivers them.
 
 Diagnostics go through `ariadne` (`nex-driver/src/diag.rs`). One wrinkle: nex
 spans are byte offsets while ariadne counts characters, so `diag.rs` converts

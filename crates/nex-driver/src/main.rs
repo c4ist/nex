@@ -58,6 +58,11 @@ enum Command {
         /// source file to scan
         file: PathBuf,
     },
+    /// dump the parsed syntax tree for a source file. dev aid
+    Parse {
+        /// source file to parse
+        file: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -74,6 +79,7 @@ fn main() -> ExitCode {
 fn run(command: Command) -> Result<(), String> {
     match command {
         Command::Lex { file } => cmd_lex(&file),
+        Command::Parse { file } => cmd_parse(&file),
         Command::Build { .. } => Err(unimplemented("build", "Phase 8 (LLVM backend)")),
         Command::Run { .. } => Err(unimplemented("run", "Phase 5 (interpreter)")),
         Command::Check { .. } => Err(unimplemented("check", "Phase 6 (type checker)")),
@@ -110,6 +116,50 @@ fn cmd_lex(path: &Path) -> Result<(), String> {
 
     eprint!("{}", diag::render(&display, &src, &diagnostics));
     Err(format!("{} lexical error(s) in {display}", errors.len()))
+}
+
+fn cmd_parse(path: &Path) -> Result<(), String> {
+    let src = read_source(path)?;
+    let display = path.display().to_string();
+
+    let (tokens, lex_errors) = nex_lexer::tokenize(&src);
+    if !lex_errors.is_empty() {
+        let diagnostics: Vec<Diagnostic> = lex_errors
+            .iter()
+            .map(|error| Diagnostic {
+                message: error.kind.to_string(),
+                span: error.span,
+                help: error.help().map(str::to_string),
+            })
+            .collect();
+        eprint!("{}", diag::render(&display, &src, &diagnostics));
+        return Err(format!(
+            "{} lexical error(s) in {display}",
+            lex_errors.len()
+        ));
+    }
+
+    let (module, errors) = nex_syntax::parse_module(&tokens);
+
+    for item in &module.items {
+        println!("{}", nex_syntax::print_item(item));
+    }
+
+    if errors.is_empty() {
+        return Ok(());
+    }
+
+    let diagnostics: Vec<Diagnostic> = errors
+        .iter()
+        .map(|error| Diagnostic {
+            message: error.message.clone(),
+            span: error.span,
+            help: None,
+        })
+        .collect();
+
+    eprint!("{}", diag::render(&display, &src, &diagnostics));
+    Err(format!("{} parse error(s) in {display}", errors.len()))
 }
 
 fn read_source(path: &Path) -> Result<String, String> {
