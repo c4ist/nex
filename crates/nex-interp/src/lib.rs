@@ -9,12 +9,21 @@
 mod env;
 mod error;
 mod eval;
+mod flow;
 mod value;
 
 pub use env::Scope;
 pub use error::{Result, RuntimeError};
 pub use eval::Interpreter;
+pub use flow::Flow;
 pub use value::{Builtin, EnumValue, FnValue, StructValue, Value};
+
+/// lexes, parses and runs a sequence of statements, giving the value of
+/// the last one. mainly for tests until `nex run` exists.
+pub fn run_str(src: &str) -> Result<Value> {
+    // wrapping in braces reuses the block parser, so `let` and loops work
+    eval_str(&format!("{{ {src} }}"))
+}
 
 /// lexes, parses and evaluates one expression. mainly for tests and the
 /// doc example; real programs go through the driver.

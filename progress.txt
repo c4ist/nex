@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.3
+last_step = 5.5
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.4 (floats, string concatenation, comparison operators)
+next_step = 5.6 (for-in loops over ranges; verify by summing 0..100)
 
 Phase status
 ------------
@@ -15,7 +15,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.3 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.5 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -222,9 +222,21 @@ Design notes
   errors, and only Bool is accepted as a condition.
 - `&&` and `||` short-circuit, so `false && undefined` is false rather
   than an undefined-name error.
-- Step 5.4 (floats, string concat, comparisons) is already covered by
-  5.3's implementation and tests; it needs confirming rather than
-  writing.
+- 5.4 needed no new interpreter code: 5.3 already covered floats, string
+  concatenation and the comparison operators. The step landed as the tests
+  that prove it, including NaN (not equal to itself, and false for every
+  ordering), float division by zero giving infinity where integers error,
+  and unicode through string concatenation. All passed first run.
+- statements (5.5) return a Flow rather than a Value, because break,
+  continue and return all have to unwind past whatever is running. A block
+  stops at the first jump and passes it outward; a while loop absorbs
+  Break and Continue but lets Return through.
+- Blocks run in a child scope, so bindings inside one don't leak and each
+  loop iteration gets a fresh scope. Assignment still reaches outward to
+  the nearest existing binding, so `{ x = 2; }` updates the outer x.
+- if/else and blocks in statement position go through the flow-aware path
+  rather than eval_in, or a `break` inside an if inside a loop would be
+  swallowed.
 - pretty.rs (print_expr/print_stmt/print_item/print_type/print_pattern)
   renders the whole AST as s-expressions for snapshot tests. It is one-way
   (not meant to be reparsed) and lossy on purpose: no spans, no NodeIds,
