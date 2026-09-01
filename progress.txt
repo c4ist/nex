@@ -4,9 +4,9 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.5
+last_step = 5.6
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.6 (for-in loops over ranges; verify by summing 0..100)
+next_step = 5.7 (function definitions and calls; verify with recursive fibonacci)
 
 Phase status
 ------------
@@ -15,7 +15,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.5 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.6 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend

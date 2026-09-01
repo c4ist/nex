@@ -230,12 +230,3 @@ fn loop_bodies_get_a_fresh_scope_each_iteration() {
     "#);
     assert_eq!(value, Value::Int(30));
 }
-
-// for loops parse but don't run yet; that's the next step
-#[test]
-fn for_loops_are_not_supported_yet() {
-    assert_eq!(
-        error("for i in 0..3 { }"),
-        "for loops are not supported yet"
-    );
-}

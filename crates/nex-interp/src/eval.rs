@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use nex_lexer::Span;
-use nex_syntax::{BinaryOp, Block, Expr, ExprKind, Stmt, StmtKind, UnaryOp};
+use nex_syntax::{BinaryOp, Block, Expr, ExprKind, Ident, Stmt, StmtKind, UnaryOp};
 
 use crate::env::Scope;
 use crate::error::{Result, RuntimeError};
@@ -186,11 +186,63 @@ impl Interpreter {
                 Ok(Flow::Return(value))
             }
 
-            StmtKind::ForIn { .. } => Err(RuntimeError::new(
-                "for loops are not supported yet",
-                stmt.info.span,
-            )),
+            StmtKind::ForIn {
+                binding,
+                iter,
+                body,
+            } => self.exec_for_in(binding, iter, body, scope),
         }
+    }
+
+    /// `for i in 0..n`. ranges are the only thing you can iterate over so
+    /// far, and the bounds are evaluated once before the loop starts.
+    fn exec_for_in(
+        &mut self,
+        binding: &Ident,
+        iter: &Expr,
+        body: &Block,
+        scope: &Rc<Scope>,
+    ) -> Result<Flow> {
+        let ExprKind::Range {
+            start,
+            end,
+            inclusive,
+        } = &iter.kind
+        else {
+            return Err(RuntimeError::new(
+                "for loops can only iterate over ranges for now",
+                iter.info.span,
+            ));
+        };
+
+        let start = match self.eval_in(start, scope)? {
+            Flow::Normal(value) => as_int(&value, start.info.span)?,
+            jump => return Ok(jump),
+        };
+        let end = match self.eval_in(end, scope)? {
+            Flow::Normal(value) => as_int(&value, end.info.span)?,
+            jump => return Ok(jump),
+        };
+
+        let mut current = start;
+        while current < end || (*inclusive && current == end) {
+            let inner = Scope::child(scope);
+            inner.define(binding.value.clone(), Value::Int(current));
+
+            match self.exec_block(body, &inner)? {
+                Flow::Normal(_) | Flow::Continue => {}
+                Flow::Break => break,
+                ret @ Flow::Return(_) => return Ok(ret),
+            }
+
+            // an inclusive range ending at i64::MAX would otherwise wrap
+            match current.checked_add(1) {
+                Some(next) => current = next,
+                None => break,
+            }
+        }
+
+        Ok(Flow::Normal(Value::Unit))
     }
 
     fn eval_if(&mut self, expr: &Expr, scope: &Rc<Scope>) -> Result<Flow> {
@@ -267,6 +319,16 @@ fn describe(kind: &ExprKind) -> &'static str {
         ExprKind::Match { .. } => "a match expression",
         ExprKind::Range { .. } => "a range",
         _ => "this expression",
+    }
+}
+
+fn as_int(value: &Value, span: Span) -> Result<i64> {
+    match value {
+        Value::Int(v) => Ok(*v),
+        other => Err(RuntimeError::new(
+            format!("expected i32, found {}", other.type_name()),
+            span,
+        )),
     }
 }
 

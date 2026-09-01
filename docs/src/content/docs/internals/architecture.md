@@ -32,7 +32,7 @@ AST (immutable)
    │  name resolution + type checker   planned
    ▼
 checked AST
-   ├── tree-walking interpreter        planned
+   ├── tree-walking interpreter        in progress
    ├── LLVM native codegen             planned
    └── WebAssembly codegen             planned
 ```
