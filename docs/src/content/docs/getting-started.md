@@ -80,7 +80,8 @@ The `examples/` directory contains the sample programs used by the test suite:
 - `tour.nex`: a tour of the planned syntax, covering structs, enums, generics, `const`,
   functions, `if`/`for`/`while`, ranges, `match`, and string escapes
 
-They lex cleanly today; they won't run until the interpreter lands (Phase 5).
+They lex and parse cleanly today. The interpreter can already run functions,
+but `nex run` isn't wired to it yet.
 
 ## What doesn't work yet
 

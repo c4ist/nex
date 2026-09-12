@@ -4,9 +4,11 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.6
+last_step = 5.7
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.7 (function definitions and calls; verify with recursive fibonacci)
+next_step = 5.8 (return/break/continue via a control-flow signal enum;
+            verify with an early-return test. note: flow.rs already does this,
+            so 5.8 is likely confirmation tests rather than new code)
 
 Phase status
 ------------
@@ -15,7 +17,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.6 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.7 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -30,6 +32,15 @@ Phase status
 Pending / deferred
 ------------------
 - CI does not yet install LLVM; needed from step 8.2.
+- Params can't be declared `mut` - Param has no mutability flag and the
+  grammar doesn't accept one, so `fn f(mut n: i32)` is a parse error. The
+  interpreter doesn't enforce mutability at all yet (that's phase 6), so
+  assigning to a parameter currently works. Decide before the spec freezes
+  in phase 7.
+- Interpreter call depth is capped at 256 (MAX_CALL_DEPTH in eval.rs).
+  nex calls nest rust calls, so without the cap runaway recursion aborts
+  the process instead of reporting an error. Revisit if a real program
+  needs deeper recursion.
 - Parser throughput baseline (4.12), on a generated 10k-line file of 83,751
   tokens, measured on the dev machine:
     debug    lex 23.9ms, parse 12.6ms, total 36.4ms   (~274k lines/sec)

@@ -3,15 +3,22 @@
 use std::rc::Rc;
 
 use nex_lexer::Span;
-use nex_syntax::{BinaryOp, Block, Expr, ExprKind, Ident, Stmt, StmtKind, UnaryOp};
+use nex_syntax::{
+    BinaryOp, Block, Expr, ExprKind, Ident, ItemKind, Module, Stmt, StmtKind, UnaryOp,
+};
 
 use crate::env::Scope;
 use crate::error::{Result, RuntimeError};
 use crate::flow::Flow;
-use crate::value::Value;
+use crate::value::{FnValue, Value};
+
+/// nex calls nest rust calls, so runaway recursion would overflow the real
+/// stack. this stops it with a runtime error instead.
+const MAX_CALL_DEPTH: usize = 256;
 
 pub struct Interpreter {
     globals: Rc<Scope>,
+    depth: usize,
 }
 
 impl Default for Interpreter {
@@ -24,11 +31,85 @@ impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
             globals: Scope::global(),
+            depth: 0,
         }
     }
 
     pub fn globals(&self) -> &Rc<Scope> {
         &self.globals
+    }
+
+    /// defines every `fn` in the module as a global, so any of them can call
+    /// any other regardless of the order they're written in. other items
+    /// aren't interpreted yet.
+    pub fn load_module(&mut self, module: &Module) -> Result<()> {
+        for item in &module.items {
+            let ItemKind::Fn(func) = &item.kind else {
+                continue;
+            };
+
+            if self.globals.defined_locally(&func.name.value) {
+                return Err(RuntimeError::new(
+                    format!("`{}` is defined more than once", func.name.value),
+                    func.name.span,
+                ));
+            }
+
+            let value = Value::Fn(Rc::new(FnValue {
+                name: func.name.value.clone(),
+                params: func.params.clone(),
+                body: func.body.clone(),
+                generics: func.generics.clone(),
+            }));
+            self.globals.define(func.name.value.clone(), value);
+        }
+        Ok(())
+    }
+
+    /// runs a function with arguments already evaluated.
+    ///
+    /// the frame hangs off the globals rather than off the caller's scope,
+    /// so a function sees its parameters and other functions but not the
+    /// caller's locals.
+    pub fn call(&mut self, func: &Rc<FnValue>, args: Vec<Value>, span: Span) -> Result<Value> {
+        if args.len() != func.params.len() {
+            return Err(RuntimeError::new(
+                format!(
+                    "`{}` takes {} argument{}, but {} were given",
+                    func.name,
+                    func.params.len(),
+                    if func.params.len() == 1 { "" } else { "s" },
+                    args.len()
+                ),
+                span,
+            ));
+        }
+
+        if self.depth >= MAX_CALL_DEPTH {
+            return Err(RuntimeError::new(
+                format!("recursion went deeper than {MAX_CALL_DEPTH} calls"),
+                span,
+            ));
+        }
+
+        let frame = Scope::child(&self.globals);
+        for (param, value) in func.params.iter().zip(args) {
+            frame.define(param.name.value.clone(), value);
+        }
+
+        self.depth += 1;
+        let flow = self.exec_block(&func.body, &frame);
+        self.depth -= 1;
+
+        match flow? {
+            // the body's last expression is the return value, and an
+            // explicit `return` overrides it
+            Flow::Normal(value) | Flow::Return(value) => Ok(value),
+            Flow::Break | Flow::Continue => Err(RuntimeError::new(
+                "break and continue can only be used inside a loop",
+                span,
+            )),
+        }
     }
 
     pub fn eval(&mut self, expr: &Expr) -> Result<Value> {
@@ -62,9 +143,44 @@ impl Interpreter {
 
             ExprKind::If { .. } => self.eval_if(expr, scope),
 
+            ExprKind::Call { callee, args } => self.eval_call(expr, callee, args, scope),
+
             other => Err(RuntimeError::new(
                 format!("{} is not supported yet", describe(other)),
                 expr.info.span,
+            )),
+        }
+    }
+
+    fn eval_call(
+        &mut self,
+        expr: &Expr,
+        callee: &Expr,
+        args: &[Expr],
+        scope: &Rc<Scope>,
+    ) -> Result<Flow> {
+        let target = match self.eval_in(callee, scope)? {
+            Flow::Normal(value) => value,
+            jump => return Ok(jump),
+        };
+
+        let mut values = Vec::with_capacity(args.len());
+        for arg in args {
+            match self.eval_in(arg, scope)? {
+                Flow::Normal(value) => values.push(value),
+                jump => return Ok(jump),
+            }
+        }
+
+        match target {
+            Value::Fn(func) => self.call(&func, values, expr.info.span).map(Flow::Normal),
+            Value::Builtin(_) => Err(RuntimeError::new(
+                "builtins are not supported yet",
+                callee.info.span,
+            )),
+            other => Err(RuntimeError::new(
+                format!("{} is not callable", other.type_name()),
+                callee.info.span,
             )),
         }
     }
@@ -310,7 +426,6 @@ impl Interpreter {
 
 fn describe(kind: &ExprKind) -> &'static str {
     match kind {
-        ExprKind::Call { .. } => "calling a function",
         ExprKind::Field { .. } => "field access",
         ExprKind::Index { .. } => "indexing",
         ExprKind::StructLit { .. } => "a struct literal",

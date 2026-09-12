@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 5.6
+- **last step:** 5.7
 - **current phase:** 5 (tree-walking interpreter)
-- **next step:** 5.7, function definitions and calls
+- **next step:** 5.8, `return`/`break`/`continue` as a control-flow signal
 
 ## Phase status
 
