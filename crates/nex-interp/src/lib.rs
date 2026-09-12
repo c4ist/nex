@@ -16,7 +16,7 @@ pub use env::Scope;
 pub use error::{Result, RuntimeError};
 pub use eval::Interpreter;
 pub use flow::Flow;
-pub use value::{Builtin, EnumValue, FnValue, StructValue, Value};
+pub use value::{Builtin, EnumValue, FnBody, FnValue, StructValue, Value};
 
 /// lexes, parses and runs a whole module, giving the value `main` returns.
 /// a module without a `main` is an error.

@@ -5,7 +5,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::rc::Rc;
 
-use nex_syntax::{Block, Ident, Param};
+use nex_syntax::{Block, Expr, Ident, Param};
+
+use crate::env::Scope;
 
 /// heap values are shared rather than copied, so `Clone` on a `Value` is
 /// cheap and two bindings can refer to the same array or struct.
@@ -36,12 +38,36 @@ pub struct EnumValue {
     pub payload: Vec<Value>,
 }
 
+/// a named function's body is a block; a closure's is a single expression.
+/// keeping them apart avoids inventing ast nodes, which would hand out
+/// duplicate `NodeId`s.
+pub enum FnBody {
+    Block(Block),
+    Expr(Expr),
+}
+
 pub struct FnValue {
+    /// empty for a closure, which has no name to report
     pub name: String,
     pub params: Vec<Param>,
-    pub body: Block,
+    pub body: FnBody,
     /// generic parameter names, unused until there's a type checker
     pub generics: Vec<Ident>,
+    /// the scope the function was written in. a call runs in a child of
+    /// this, which is what lets a closure keep reading the bindings around
+    /// it after that scope has ended.
+    pub env: Rc<Scope>,
+}
+
+impl FnValue {
+    /// how the function is named in an error message
+    pub fn describe(&self) -> String {
+        if self.name.is_empty() {
+            "closure".to_string()
+        } else {
+            format!("`{}`", self.name)
+        }
+    }
 }
 
 /// a function implemented in rust rather than nex
@@ -137,7 +163,10 @@ impl fmt::Display for Value {
                 }
                 f.write_str(")")
             }
-            Value::Fn(func) => write!(f, "fn {}", func.name),
+            Value::Fn(func) => match func.name.is_empty() {
+                true => f.write_str("closure"),
+                false => write!(f, "fn {}", func.name),
+            },
             Value::Builtin(b) => write!(f, "fn {}", b.name),
         }
     }

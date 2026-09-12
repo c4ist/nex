@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 5.8
+- **last step:** 5.9
 - **current phase:** 5 (tree-walking interpreter)
-- **next step:** 5.9, closures that capture their defining environment
+- **next step:** 5.10, struct literals and field access
 
 ## Phase status
 

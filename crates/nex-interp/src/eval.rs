@@ -10,7 +10,7 @@ use nex_syntax::{
 use crate::env::Scope;
 use crate::error::{Result, RuntimeError};
 use crate::flow::Flow;
-use crate::value::{FnValue, Value};
+use crate::value::{FnBody, FnValue, Value};
 
 /// nex calls nest rust calls, so runaway recursion would overflow the real
 /// stack. this stops it with a runtime error instead.
@@ -58,8 +58,9 @@ impl Interpreter {
             let value = Value::Fn(Rc::new(FnValue {
                 name: func.name.value.clone(),
                 params: func.params.clone(),
-                body: func.body.clone(),
+                body: FnBody::Block(func.body.clone()),
                 generics: func.generics.clone(),
+                env: Rc::clone(&self.globals),
             }));
             self.globals.define(func.name.value.clone(), value);
         }
@@ -75,8 +76,8 @@ impl Interpreter {
         if args.len() != func.params.len() {
             return Err(RuntimeError::new(
                 format!(
-                    "`{}` takes {} argument{}, but {} were given",
-                    func.name,
+                    "{} takes {} argument{}, but {} were given",
+                    func.describe(),
                     func.params.len(),
                     if func.params.len() == 1 { "" } else { "s" },
                     args.len()
@@ -92,13 +93,16 @@ impl Interpreter {
             ));
         }
 
-        let frame = Scope::child(&self.globals);
+        let frame = Scope::child(&func.env);
         for (param, value) in func.params.iter().zip(args) {
             frame.define(param.name.value.clone(), value);
         }
 
         self.depth += 1;
-        let flow = self.exec_block(&func.body, &frame);
+        let flow = match &func.body {
+            FnBody::Block(block) => self.exec_block(block, &frame),
+            FnBody::Expr(expr) => self.eval_in(expr, &frame),
+        };
         self.depth -= 1;
 
         match flow? {
@@ -142,6 +146,17 @@ impl Interpreter {
             ExprKind::If { .. } => self.eval_if(expr, scope),
 
             ExprKind::Call { callee, args } => self.eval_call(expr, callee, args, scope),
+
+            ExprKind::Closure { params, body } => {
+                let value = Value::Fn(Rc::new(FnValue {
+                    name: String::new(),
+                    params: params.clone(),
+                    body: FnBody::Expr((**body).clone()),
+                    generics: Vec::new(),
+                    env: Rc::clone(scope),
+                }));
+                Ok(Flow::Normal(value))
+            }
 
             other => Err(RuntimeError::new(
                 format!("{} is not supported yet", describe(other)),

@@ -4,10 +4,10 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.8
+last_step = 5.9
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.9 (closures: capture the defining environment;
-            verify with a counter-closure test)
+next_step = 5.10 (struct literals and field access; verify with a Point
+             distance test)
 
 Phase status
 ------------
@@ -16,7 +16,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.8 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.9 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -57,6 +57,17 @@ Pending / deferred
 
 Design notes
 ------------
+- Closure syntax (|x| x + 1) was added during 5.9. The plan assumed closures
+  were writable, but there was no syntax for them and a fn item can't nest
+  inside a block, so nothing could be tested. `|` starts a closure in
+  expression position and stays bitwise or between two expressions. An
+  unannotated parameter gets TypeKind::Infer.
+- FnValue holds the scope it was written in (env). A call runs in a child of
+  that, not of the caller, which is what makes scoping lexical. A top-level
+  fn captures the globals; a closure captures wherever it appeared.
+- FnValue::body is an enum (FnBody) rather than always a Block, because a
+  closure body is a single expression. Wrapping it in a synthesised Block
+  would have handed out duplicate NodeIds.
 - NodeIds are dense and sequential so they can index side tables directly.
   Later passes must store their results in side tables keyed by NodeId rather
   than mutating the AST, which stays immutable after parsing.
