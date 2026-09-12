@@ -3,7 +3,7 @@
 
 use crate::expr::{BinaryOp, Block, Expr, ExprKind, FieldInit, MatchArm, UnaryOp};
 use crate::item::{
-    Enum, FieldDef as ItemFieldDef, Fn, Impl, Item, ItemKind, Mod, Struct, Use, Variant,
+    Enum, FieldDef as ItemFieldDef, Fn, Impl, Item, ItemKind, Mod, Param, Struct, Use, Variant,
 };
 use crate::node::Ident;
 use crate::pattern::{FieldPattern, Pattern, PatternKind};
@@ -106,6 +106,9 @@ pub fn print_expr(expr: &Expr) -> String {
             let head = if *inclusive { "range-incl" } else { "range" };
             sexp(head, &[print_expr(start), print_expr(end)])
         }
+        ExprKind::Closure { params, body } => {
+            sexp("closure", &[print_params(params), print_expr(body)])
+        }
     }
 }
 
@@ -187,6 +190,7 @@ pub fn print_type(ty: &Type) -> String {
                 None => sexp("fn-type", &[params_str]),
             }
         }
+        TypeKind::Infer => "_".to_string(),
     }
 }
 
@@ -247,13 +251,17 @@ fn print_generics(generics: &[Ident]) -> String {
     list(&generics.iter().map(ident_str).collect::<Vec<_>>())
 }
 
-fn print_fn(f: &Fn) -> String {
-    let params = list(
-        &f.params
+fn print_params(params: &[Param]) -> String {
+    list(
+        &params
             .iter()
             .map(|p| list(&[ident_str(&p.name), print_type(&p.ty)]))
             .collect::<Vec<_>>(),
-    );
+    )
+}
+
+fn print_fn(f: &Fn) -> String {
+    let params = print_params(&f.params);
     let ret = match &f.return_type {
         Some(ty) => print_type(ty),
         None => "()".to_string(),

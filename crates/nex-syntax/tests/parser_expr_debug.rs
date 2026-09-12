@@ -557,3 +557,65 @@ fn recovery_terminates_at_end_of_file() {
         ]
     );
 }
+
+// closures
+
+#[test]
+fn parses_a_closure() {
+    assert_eq!(sexp("|x| x + 1"), "(closure ((x _)) (+ x 1))");
+}
+
+// `||` is one token, so an empty parameter list is its own case
+#[test]
+fn parses_a_closure_with_no_parameters() {
+    assert_eq!(sexp("|| 0"), "(closure () 0)");
+}
+
+#[test]
+fn parses_closure_parameters() {
+    assert_eq!(sexp("|a, b| a"), "(closure ((a _) (b _)) a)");
+    assert_eq!(sexp("|a, b,| a"), "(closure ((a _) (b _)) a)");
+}
+
+// a parameter can be annotated, and an unannotated one prints as `_`
+#[test]
+fn parses_annotated_closure_parameters() {
+    assert_eq!(sexp("|a: i32, b: str| a"), "(closure ((a i32) (b str)) a)");
+    assert_eq!(sexp("|a: i32, b| a"), "(closure ((a i32) (b _)) a)");
+}
+
+#[test]
+fn parses_a_closure_with_a_block_body() {
+    assert_eq!(sexp("|n| { n * 2 }"), "(closure ((n _)) (block (* n 2)))");
+}
+
+// the body takes as much as it can, so this is one closure returning a sum
+#[test]
+fn a_closure_body_extends_as_far_as_it_can() {
+    assert_eq!(sexp("|x| x + 1 + 2"), "(closure ((x _)) (+ (+ x 1) 2))");
+}
+
+#[test]
+fn closures_nest() {
+    assert_eq!(
+        sexp("|a| |b| a + b"),
+        "(closure ((a _)) (closure ((b _)) (+ a b)))"
+    );
+}
+
+#[test]
+fn a_closure_can_be_an_argument() {
+    assert_eq!(sexp("f(|x| x, 1)"), "(call f (closure ((x _)) x) 1)");
+}
+
+// `|` is still bitwise or when it isn't starting an expression
+#[test]
+fn pipe_is_still_an_operator_between_expressions() {
+    assert_eq!(sexp("1 | 2"), "(| 1 2)");
+    assert_eq!(sexp("a || b"), "(|| a b)");
+}
+
+#[test]
+fn a_closure_can_be_called_immediately() {
+    assert_eq!(sexp("(|x| x)(1)"), "(call (closure ((x _)) x) 1)");
+}

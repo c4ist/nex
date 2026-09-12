@@ -38,8 +38,25 @@ fn main() {
         Option::Some(v) => print(v),
         Option::None => print("none"),
     }
+    let double = |n| n * 2;
+    print(double(x));
 }
 ```
+
+## Closures
+
+`|params| body`. The body is a single expression, which can be a block.
+Parameter types are optional and inferred when they're left off.
+
+```rust
+let inc = |x| x + 1;
+let add = |a: i32, b: i32| a + b;
+let now = || 0;
+let scaled = |n| { let factor = 3; n * factor };
+```
+
+A closure captures the scope it was written in, so it can still read those
+bindings after that scope has ended.
 
 ## Types
 
@@ -69,6 +86,8 @@ monomorphisation in the backend.
 - **Strings:** `"..."` with `\n \r \t \0 \\ \" \xNN` escapes
 - **Operators:** `+ - * / % = == != < <= > >= && || ! & | ^ << >>
   += -= *= /= -> => .. ..= :: : ; , . ( ) { } [ ]`
+- **`|`:** bitwise or between two expressions, and the start of a closure
+  where an expression is expected
 
 ## Memory
 

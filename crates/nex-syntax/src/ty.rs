@@ -41,4 +41,7 @@ pub enum TypeKind {
         params: Vec<Type>,
         return_type: Option<Box<Type>>,
     },
+    /// no type was written, as in a closure parameter. the type checker
+    /// fills these in.
+    Infer,
 }

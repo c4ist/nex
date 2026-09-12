@@ -353,6 +353,40 @@ impl<'a> Parser<'a> {
         expr
     }
 
+    /// `|x| x + 1`, with optional type annotations. `||` lexes as one token,
+    /// so an empty parameter list is its own case.
+    fn parse_closure(&mut self) -> Expr {
+        let open = self.advance();
+        let params = if open.kind == TokenKind::PipePipe {
+            Vec::new()
+        } else {
+            let params = self.comma_separated(TokenKind::Pipe, |p| {
+                let name = p.expect_ident();
+                let span = name.span;
+                let ty = if p.peek().kind == TokenKind::Colon {
+                    p.parse_annotation()
+                } else {
+                    // unannotated, so the type checker works it out later
+                    Type::new(TypeKind::Infer, NodeInfo::new(p.ids.fresh(), span))
+                };
+                let span = span.merge(ty.info.span);
+                Param::new(name, ty, NodeInfo::new(p.ids.fresh(), span))
+            });
+            self.expect(TokenKind::Pipe);
+            params
+        };
+
+        let body = self.parse_expr();
+        let span = open.span.merge(body.info.span);
+        self.leaf(
+            ExprKind::Closure {
+                params,
+                body: Box::new(body),
+            },
+            span,
+        )
+    }
+
     fn parse_call_args(&mut self) -> Vec<Expr> {
         self.comma_separated(TokenKind::RParen, |p| {
             p.with_struct_literals(|p| p.parse_expr())
@@ -362,6 +396,8 @@ impl<'a> Parser<'a> {
     fn parse_leaf(&mut self) -> Expr {
         match self.peek().kind {
             TokenKind::LParen => return self.parse_paren(),
+            // `|` starts a closure here; as an infix operator it's bitwise or
+            TokenKind::Pipe | TokenKind::PipePipe => return self.parse_closure(),
             TokenKind::LBrace => {
                 let block = self.parse_block();
                 let span = block.info.span;

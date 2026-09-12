@@ -1,5 +1,6 @@
 //! expression ast.
 
+use crate::item::Param;
 use crate::node::{AstNode, HasSpan, Ident, NodeId, NodeInfo, Spanned};
 use crate::pattern::Pattern;
 use crate::stmt::Stmt;
@@ -104,6 +105,11 @@ pub enum ExprKind {
         start: Box<Expr>,
         end: Box<Expr>,
         inclusive: bool,
+    },
+    /// `|x| x + 1`; the body is one expression, which can be a block
+    Closure {
+        params: Vec<Param>,
+        body: Box<Expr>,
     },
 }
 
