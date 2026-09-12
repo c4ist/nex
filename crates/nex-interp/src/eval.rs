@@ -104,17 +104,15 @@ impl Interpreter {
         match flow? {
             // the body's last expression is the return value, and an
             // explicit `return` overrides it
-            Flow::Normal(value) | Flow::Return(value) => Ok(value),
-            Flow::Break | Flow::Continue => Err(RuntimeError::new(
-                "break and continue can only be used inside a loop",
-                span,
-            )),
+            Flow::Normal(value) | Flow::Return(value, _) => Ok(value),
+            // a loop would have caught these, so there wasn't one
+            jump => jump.into_value(),
         }
     }
 
     pub fn eval(&mut self, expr: &Expr) -> Result<Value> {
         let scope = Rc::clone(&self.globals);
-        Ok(self.eval_in(expr, &scope)?.value())
+        self.eval_in(expr, &scope)?.into_value()
     }
 
     pub fn eval_in(&mut self, expr: &Expr, scope: &Rc<Scope>) -> Result<Flow> {
@@ -279,17 +277,17 @@ impl Interpreter {
                     }
                     match self.exec_block(body, scope)? {
                         // `continue` ends this iteration, not the loop
-                        Flow::Normal(_) | Flow::Continue => {}
-                        Flow::Break => break,
+                        Flow::Normal(_) | Flow::Continue(_) => {}
+                        Flow::Break(_) => break,
                         // a return has to keep going past the loop
-                        ret @ Flow::Return(_) => return Ok(ret),
+                        ret @ Flow::Return(..) => return Ok(ret),
                     }
                 }
                 Ok(Flow::Normal(Value::Unit))
             }
 
-            StmtKind::Break => Ok(Flow::Break),
-            StmtKind::Continue => Ok(Flow::Continue),
+            StmtKind::Break => Ok(Flow::Break(stmt.info.span)),
+            StmtKind::Continue => Ok(Flow::Continue(stmt.info.span)),
 
             StmtKind::Return(value) => {
                 let value = match value {
@@ -299,7 +297,7 @@ impl Interpreter {
                     },
                     None => Value::Unit,
                 };
-                Ok(Flow::Return(value))
+                Ok(Flow::Return(value, stmt.info.span))
             }
 
             StmtKind::ForIn {
@@ -346,9 +344,9 @@ impl Interpreter {
             inner.define(binding.value.clone(), Value::Int(current));
 
             match self.exec_block(body, &inner)? {
-                Flow::Normal(_) | Flow::Continue => {}
-                Flow::Break => break,
-                ret @ Flow::Return(_) => return Ok(ret),
+                Flow::Normal(_) | Flow::Continue(_) => {}
+                Flow::Break(_) => break,
+                ret @ Flow::Return(..) => return Ok(ret),
             }
 
             // an inclusive range ending at i64::MAX would otherwise wrap

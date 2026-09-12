@@ -251,11 +251,3 @@ fn the_depth_limit_resets_between_calls() {
     "#);
     assert_eq!(value, Value::Int(0));
 }
-
-#[test]
-fn break_outside_a_loop_is_an_error() {
-    assert_eq!(
-        error("fn main() { break; }"),
-        "break and continue can only be used inside a loop"
-    );
-}

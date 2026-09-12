@@ -1,4 +1,4 @@
-#  💽 nex
+#  💽 nex --- PAUSED FOR NOW. 
 
 A lightweight, statically typed, compiled programming language.
 

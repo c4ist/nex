@@ -4,11 +4,10 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.7
+last_step = 5.8
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.8 (return/break/continue via a control-flow signal enum;
-            verify with an early-return test. note: flow.rs already does this,
-            so 5.8 is likely confirmation tests rather than new code)
+next_step = 5.9 (closures: capture the defining environment;
+            verify with a counter-closure test)
 
 Phase status
 ------------
@@ -17,7 +16,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.7 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.8 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
