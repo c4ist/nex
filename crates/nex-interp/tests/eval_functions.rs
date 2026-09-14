@@ -1,6 +1,6 @@
 //! function definitions and calls.
 
-use nex_interp::{run_module, Value};
+use nex_interp::{run_module, Value, MAX_CALL_DEPTH};
 
 #[track_caller]
 fn run(src: &str) -> Value {
@@ -231,7 +231,8 @@ fn endless_recursion_hits_a_depth_limit() {
         fn forever(n: i32) -> i32 { forever(n + 1) }
         fn main() -> i32 { forever(0) }
     "#;
-    assert_eq!(error(src), "recursion went deeper than 256 calls");
+    let expected = format!("recursion went deeper than {MAX_CALL_DEPTH} calls");
+    assert_eq!(error(src), expected);
 }
 
 // the limit is per nesting level, not a budget for the whole program
@@ -249,5 +250,6 @@ fn the_depth_limit_resets_between_calls() {
             total
         }
     "#);
+    // 100 nested calls, ten times over, without tripping the cap
     assert_eq!(value, Value::Int(0));
 }

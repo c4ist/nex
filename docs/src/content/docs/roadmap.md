@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 5.10
+- **last step:** 5.11
 - **current phase:** 5 (tree-walking interpreter)
-- **next step:** 5.11, arrays and the `len()` builtin
+- **next step:** 5.12, the `print`, `str`, `int` and `float` builtins
 
 ## Phase status
 

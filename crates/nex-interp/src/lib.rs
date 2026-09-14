@@ -6,6 +6,7 @@
 //! assert_eq!(eval_str("1 + 2 * 3").unwrap(), Value::Int(7));
 //! ```
 
+mod builtins;
 mod env;
 mod error;
 mod eval;
@@ -14,7 +15,7 @@ mod value;
 
 pub use env::Scope;
 pub use error::{Result, RuntimeError};
-pub use eval::Interpreter;
+pub use eval::{Interpreter, MAX_CALL_DEPTH};
 pub use flow::Flow;
 pub use value::{Builtin, EnumValue, FnBody, FnValue, StructValue, Value};
 

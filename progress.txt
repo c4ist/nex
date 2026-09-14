@@ -4,10 +4,10 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.10
+last_step = 5.11
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.11 (arrays: literal, index, len() builtin; verify with
-             array tests)
+next_step = 5.12 (builtins: print, str(), int(), float(); len() already
+             landed in 5.11. verify with hello world through the interpreter)
 
 Phase status
 ------------
@@ -16,7 +16,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.10 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.11 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -36,15 +36,21 @@ Pending / deferred
   interpreter doesn't enforce mutability at all yet (that's phase 6), so
   assigning to a parameter currently works. Decide before the spec freezes
   in phase 7.
+- Index mutation (a[0] = 5) is not supported, same cause as field
+  mutation below.
 - Field mutation (p.x = 5) is not supported; exec_assign only handles a
   plain identifier target. The plan defers it, and the message says so.
   Needs the assignment path to resolve a place rather than a name.
 - No sqrt until builtins land in 5.12, so the 5.10 Point test checks the
   squared distance.
-- Interpreter call depth is capped at 256 (MAX_CALL_DEPTH in eval.rs).
+- Interpreter call depth is capped at 128 (MAX_CALL_DEPTH in eval.rs).
   nex calls nest rust calls, so without the cap runaway recursion aborts
-  the process instead of reporting an error. Revisit if a real program
-  needs deeper recursion.
+  the process instead of reporting an error. It was 256 until 5.11: adding
+  array and index evaluation grew each eval_in frame enough that 256 nex
+  frames overflowed a test harness thread for real. The cap has to stay
+  well under what the thinnest thread holds, so check the guard test still
+  passes after adding to eval_in. The test reads the constant rather than
+  hardcoding the number.
 - Parser throughput baseline (4.12), on a generated 10k-line file of 83,751
   tokens, measured on the dev machine:
     debug    lex 23.9ms, parse 12.6ms, total 36.4ms   (~274k lines/sec)
@@ -62,6 +68,13 @@ Pending / deferred
 
 Design notes
 ------------
+- Array literal syntax ([1, 2, 3]) was added during 5.11; the [T] type
+  already parsed but there was no way to write a value. `[` starts a
+  literal where an expression is expected and stays an index after one.
+- Builtins live in nex-interp/src/builtins.rs and are defined into the
+  globals by Interpreter::new, so they're ordinary values: `len` can be
+  passed to a function like any other. 5.11 added len; 5.12 adds the rest.
+- len on a str counts bytes, matching the unit spans use.
 - Struct definitions live in Interpreter.structs (name -> field names in
   declaration order), filled by load_module. A literal has to give every
   declared field exactly once; there are no defaults, and field order in

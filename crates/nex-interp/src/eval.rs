@@ -9,6 +9,7 @@ use nex_syntax::{
     BinaryOp, Block, Expr, ExprKind, FieldInit, Ident, ItemKind, Module, Stmt, StmtKind, UnaryOp,
 };
 
+use crate::builtins;
 use crate::env::Scope;
 use crate::error::{Result, RuntimeError};
 use crate::flow::Flow;
@@ -16,7 +17,12 @@ use crate::value::{FnBody, FnValue, StructValue, Value};
 
 /// nex calls nest rust calls, so runaway recursion would overflow the real
 /// stack. this stops it with a runtime error instead.
-const MAX_CALL_DEPTH: usize = 256;
+///
+/// it has to stay well under what the thinnest thread can hold, since a
+/// test harness thread gets far less stack than main. raising it, or
+/// growing what `eval_in` puts on the stack, risks a real overflow: the
+/// cap was 256 until arrays and indexing made each frame bigger.
+pub const MAX_CALL_DEPTH: usize = 128;
 
 pub struct Interpreter {
     globals: Rc<Scope>,
@@ -33,11 +39,17 @@ impl Default for Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {
+        let interpreter = Interpreter {
             globals: Scope::global(),
             structs: HashMap::new(),
             depth: 0,
+        };
+        for builtin in builtins::ALL {
+            interpreter
+                .globals
+                .define(builtin.name, Value::Builtin(*builtin));
         }
+        interpreter
     }
 
     pub fn globals(&self) -> &Rc<Scope> {
@@ -167,6 +179,29 @@ impl Interpreter {
 
             ExprKind::Call { callee, args } => self.eval_call(expr, callee, args, scope),
 
+            ExprKind::Array(items) => {
+                let mut values = Vec::with_capacity(items.len());
+                for item in items {
+                    match self.eval_in(item, scope)? {
+                        Flow::Normal(value) => values.push(value),
+                        jump => return Ok(jump),
+                    }
+                }
+                Ok(Flow::Normal(Value::array(values)))
+            }
+
+            ExprKind::Index { base, index } => {
+                let target = match self.eval_in(base, scope)? {
+                    Flow::Normal(value) => value,
+                    jump => return Ok(jump),
+                };
+                let position = match self.eval_in(index, scope)? {
+                    Flow::Normal(value) => value,
+                    jump => return Ok(jump),
+                };
+                index_of(&target, &position, index.info.span).map(Flow::Normal)
+            }
+
             ExprKind::StructLit { name, fields } => self.eval_struct_lit(name, fields, scope),
 
             ExprKind::Field { base, field } => {
@@ -217,10 +252,9 @@ impl Interpreter {
 
         match target {
             Value::Fn(func) => self.call(&func, values, expr.info.span).map(Flow::Normal),
-            Value::Builtin(_) => Err(RuntimeError::new(
-                "builtins are not supported yet",
-                callee.info.span,
-            )),
+            Value::Builtin(builtin) => {
+                builtins::call(builtin, values, expr.info.span).map(Flow::Normal)
+            }
             other => Err(RuntimeError::new(
                 format!("{} is not callable", other.type_name()),
                 callee.info.span,
@@ -520,7 +554,6 @@ impl Interpreter {
 
 fn describe(kind: &ExprKind) -> &'static str {
     match kind {
-        ExprKind::Index { .. } => "indexing",
         ExprKind::If { .. } => "an if expression",
         ExprKind::Block(_) => "a block",
         ExprKind::Match { .. } => "a match expression",
@@ -537,6 +570,31 @@ fn as_int(value: &Value, span: Span) -> Result<i64> {
             span,
         )),
     }
+}
+
+/// `a[i]`. indices are zero-based, and reading past the end is an error
+/// rather than a wrap-around or a default.
+fn index_of(target: &Value, position: &Value, span: Span) -> Result<Value> {
+    let Value::Array(items) = target else {
+        return Err(RuntimeError::new(
+            format!("cannot index {}", target.type_name()),
+            span,
+        ));
+    };
+
+    let index = as_int(position, span)?;
+    let items = items.borrow();
+    if index < 0 || index as usize >= items.len() {
+        return Err(RuntimeError::new(
+            format!(
+                "index {index} is out of bounds for an array of {}",
+                items.len()
+            ),
+            span,
+        ));
+    }
+
+    Ok(items[index as usize].clone())
 }
 
 fn field_of(value: &Value, field: &Ident) -> Result<Value> {
