@@ -1,16 +1,18 @@
 //! expression evaluation.
 
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use nex_lexer::Span;
 use nex_syntax::{
-    BinaryOp, Block, Expr, ExprKind, Ident, ItemKind, Module, Stmt, StmtKind, UnaryOp,
+    BinaryOp, Block, Expr, ExprKind, FieldInit, Ident, ItemKind, Module, Stmt, StmtKind, UnaryOp,
 };
 
 use crate::env::Scope;
 use crate::error::{Result, RuntimeError};
 use crate::flow::Flow;
-use crate::value::{FnBody, FnValue, Value};
+use crate::value::{FnBody, FnValue, StructValue, Value};
 
 /// nex calls nest rust calls, so runaway recursion would overflow the real
 /// stack. this stops it with a runtime error instead.
@@ -18,6 +20,8 @@ const MAX_CALL_DEPTH: usize = 256;
 
 pub struct Interpreter {
     globals: Rc<Scope>,
+    /// field names of each declared struct, in declaration order
+    structs: HashMap<String, Vec<String>>,
     depth: usize,
 }
 
@@ -31,6 +35,7 @@ impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
             globals: Scope::global(),
+            structs: HashMap::new(),
             depth: 0,
         }
     }
@@ -39,11 +44,26 @@ impl Interpreter {
         &self.globals
     }
 
-    /// defines every `fn` in the module as a global, so any of them can call
-    /// any other regardless of the order they're written in. other items
-    /// aren't interpreted yet.
+    /// records the module's structs and defines every `fn` as a global, so
+    /// any of them can call any other regardless of the order they're
+    /// written in. enums, impls and uses aren't interpreted yet.
     pub fn load_module(&mut self, module: &Module) -> Result<()> {
         for item in &module.items {
+            if let ItemKind::Struct(def) = &item.kind {
+                let fields = def.fields.iter().map(|f| f.name.value.clone()).collect();
+                if self
+                    .structs
+                    .insert(def.name.value.clone(), fields)
+                    .is_some()
+                {
+                    return Err(RuntimeError::new(
+                        format!("`{}` is defined more than once", def.name.value),
+                        def.name.span,
+                    ));
+                }
+                continue;
+            }
+
             let ItemKind::Fn(func) = &item.kind else {
                 continue;
             };
@@ -147,6 +167,16 @@ impl Interpreter {
 
             ExprKind::Call { callee, args } => self.eval_call(expr, callee, args, scope),
 
+            ExprKind::StructLit { name, fields } => self.eval_struct_lit(name, fields, scope),
+
+            ExprKind::Field { base, field } => {
+                let value = match self.eval_in(base, scope)? {
+                    Flow::Normal(value) => value,
+                    jump => return Ok(jump),
+                };
+                field_of(&value, field).map(Flow::Normal)
+            }
+
             ExprKind::Closure { params, body } => {
                 let value = Value::Fn(Rc::new(FnValue {
                     name: String::new(),
@@ -196,6 +226,57 @@ impl Interpreter {
                 callee.info.span,
             )),
         }
+    }
+
+    /// `Point { x: 1.0, y: 2.0 }`. every declared field has to be given
+    /// exactly once; there are no defaults.
+    fn eval_struct_lit(
+        &mut self,
+        name: &Ident,
+        fields: &[FieldInit],
+        scope: &Rc<Scope>,
+    ) -> Result<Flow> {
+        let declared = self
+            .structs
+            .get(&name.value)
+            .ok_or_else(|| {
+                RuntimeError::new(format!("`{}` is not a struct", name.value), name.span)
+            })?
+            .clone();
+
+        let mut values = BTreeMap::new();
+        for field in fields {
+            if !declared.contains(&field.name.value) {
+                return Err(RuntimeError::new(
+                    format!("`{}` has no field `{}`", name.value, field.name.value),
+                    field.name.span,
+                ));
+            }
+
+            let value = match self.eval_in(&field.value, scope)? {
+                Flow::Normal(value) => value,
+                jump => return Ok(jump),
+            };
+
+            if values.insert(field.name.value.clone(), value).is_some() {
+                return Err(RuntimeError::new(
+                    format!("field `{}` is given twice", field.name.value),
+                    field.name.span,
+                ));
+            }
+        }
+
+        if let Some(missing) = declared.iter().find(|f| !values.contains_key(*f)) {
+            return Err(RuntimeError::new(
+                format!("missing field `{missing}` in `{}`", name.value),
+                name.span,
+            ));
+        }
+
+        Ok(Flow::Normal(Value::Struct(Rc::new(StructValue {
+            name: name.value.clone(),
+            fields: RefCell::new(values),
+        }))))
     }
 
     fn binary_expr(
@@ -439,9 +520,7 @@ impl Interpreter {
 
 fn describe(kind: &ExprKind) -> &'static str {
     match kind {
-        ExprKind::Field { .. } => "field access",
         ExprKind::Index { .. } => "indexing",
-        ExprKind::StructLit { .. } => "a struct literal",
         ExprKind::If { .. } => "an if expression",
         ExprKind::Block(_) => "a block",
         ExprKind::Match { .. } => "a match expression",
@@ -458,6 +537,22 @@ fn as_int(value: &Value, span: Span) -> Result<i64> {
             span,
         )),
     }
+}
+
+fn field_of(value: &Value, field: &Ident) -> Result<Value> {
+    let Value::Struct(s) = value else {
+        return Err(RuntimeError::new(
+            format!("{} has no fields", value.type_name()),
+            field.span,
+        ));
+    };
+
+    s.fields.borrow().get(&field.value).cloned().ok_or_else(|| {
+        RuntimeError::new(
+            format!("`{}` has no field `{}`", s.name, field.value),
+            field.span,
+        )
+    })
 }
 
 fn as_bool(value: &Value, span: Span) -> Result<bool> {

@@ -139,7 +139,9 @@ fn float_division_by_zero_follows_ieee() {
 
 #[test]
 fn unsupported_expressions_say_so() {
-    assert_eq!(error("S { x: 1 }"), "a struct literal is not supported yet");
     assert_eq!(error("0..3"), "a range is not supported yet");
-    assert_eq!(error("a.b"), "field access is not supported yet");
+    assert_eq!(
+        error("match 1 { _ => 2 }"),
+        "a match expression is not supported yet"
+    );
 }

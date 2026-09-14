@@ -4,10 +4,10 @@ Nex implementation progress
 Plan: ~/.windsurf/plans/nex-language-mega-plan-89fb72.md
 One micro-step per commit. Do not skip ahead.
 
-last_step = 5.9
+last_step = 5.10
 current_phase = 5 (Tree-walk interpreter) - in progress
-next_step = 5.10 (struct literals and field access; verify with a Point
-             distance test)
+next_step = 5.11 (arrays: literal, index, len() builtin; verify with
+             array tests)
 
 Phase status
 ------------
@@ -16,7 +16,7 @@ Phase status
 [x] Phase 2  AST design
 [x] Phase 3  Parser: expressions
 [x] Phase 4  Parser: statements & items
-[~] Phase 5  Tree-walk interpreter   (5.1-5.9 done)
+[~] Phase 5  Tree-walk interpreter   (5.1-5.10 done)
 [ ] Phase 6  Name resolution + type checker
 [ ] Phase 7  Language feature wave 2
 [ ] Phase 8  LLVM backend
@@ -36,6 +36,11 @@ Pending / deferred
   interpreter doesn't enforce mutability at all yet (that's phase 6), so
   assigning to a parameter currently works. Decide before the spec freezes
   in phase 7.
+- Field mutation (p.x = 5) is not supported; exec_assign only handles a
+  plain identifier target. The plan defers it, and the message says so.
+  Needs the assignment path to resolve a place rather than a name.
+- No sqrt until builtins land in 5.12, so the 5.10 Point test checks the
+  squared distance.
 - Interpreter call depth is capped at 256 (MAX_CALL_DEPTH in eval.rs).
   nex calls nest rust calls, so without the cap runaway recursion aborts
   the process instead of reporting an error. Revisit if a real program
@@ -57,6 +62,10 @@ Pending / deferred
 
 Design notes
 ------------
+- Struct definitions live in Interpreter.structs (name -> field names in
+  declaration order), filled by load_module. A literal has to give every
+  declared field exactly once; there are no defaults, and field order in
+  the literal is free.
 - Closure syntax (|x| x + 1) was added during 5.9. The plan assumed closures
   were writable, but there was no syntax for them and a fn item can't nest
   inside a block, so nothing could be tested. `|` starts a closure in

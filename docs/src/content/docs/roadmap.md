@@ -10,9 +10,9 @@ one step per commit, no skipping ahead.
 
 ## Current position
 
-- **last step:** 5.9
+- **last step:** 5.10
 - **current phase:** 5 (tree-walking interpreter)
-- **next step:** 5.10, struct literals and field access
+- **next step:** 5.11, arrays and the `len()` builtin
 
 ## Phase status
 
