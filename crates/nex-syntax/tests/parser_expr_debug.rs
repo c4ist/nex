@@ -619,3 +619,37 @@ fn pipe_is_still_an_operator_between_expressions() {
 fn a_closure_can_be_called_immediately() {
     assert_eq!(sexp("(|x| x)(1)"), "(call (closure ((x _)) x) 1)");
 }
+
+// array literals
+
+#[test]
+fn parses_an_array_literal() {
+    assert_eq!(sexp("[1, 2, 3]"), "(array 1 2 3)");
+}
+
+#[test]
+fn parses_an_empty_array() {
+    assert_eq!(sexp("[]"), "(array)");
+}
+
+#[test]
+fn parses_an_array_with_a_trailing_comma() {
+    assert_eq!(sexp("[1, 2,]"), "(array 1 2)");
+}
+
+#[test]
+fn array_elements_are_expressions() {
+    assert_eq!(sexp("[1 + 1, f(2)]"), "(array (+ 1 1) (call f 2))");
+}
+
+#[test]
+fn arrays_nest() {
+    assert_eq!(sexp("[[1, 2], [3]]"), "(array (array 1 2) (array 3))");
+}
+
+// `[` after an expression is still indexing
+#[test]
+fn indexing_still_parses_after_an_expression() {
+    assert_eq!(sexp("a[0]"), "(index a 0)");
+    assert_eq!(sexp("[1, 2][0]"), "(index (array 1 2) 0)");
+}

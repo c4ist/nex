@@ -43,6 +43,12 @@ fn main() {
 }
 ```
 
+## Arrays
+
+`[1, 2, 3]`, indexed with `a[0]`. Indices are zero-based, and reading past the
+end is a runtime error rather than a wrap-around or a default. `len(a)` gives
+the element count.
+
 ## Closures
 
 `|params| body`. The body is a single expression, which can be a block.

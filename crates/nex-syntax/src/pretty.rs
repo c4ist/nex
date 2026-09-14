@@ -106,6 +106,7 @@ pub fn print_expr(expr: &Expr) -> String {
             let head = if *inclusive { "range-incl" } else { "range" };
             sexp(head, &[print_expr(start), print_expr(end)])
         }
+        ExprKind::Array(items) => sexp("array", &items.iter().map(print_expr).collect::<Vec<_>>()),
         ExprKind::Closure { params, body } => {
             sexp("closure", &[print_params(params), print_expr(body)])
         }

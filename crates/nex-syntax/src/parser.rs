@@ -387,6 +387,16 @@ impl<'a> Parser<'a> {
         )
     }
 
+    fn parse_array(&mut self) -> Expr {
+        let open = self.expect(TokenKind::LBracket);
+        let items = self.comma_separated(TokenKind::RBracket, |p| {
+            p.with_struct_literals(|p| p.parse_expr())
+        });
+        let close = self.expect(TokenKind::RBracket);
+        let span = open.span.merge(close.span);
+        self.leaf(ExprKind::Array(items), span)
+    }
+
     fn parse_call_args(&mut self) -> Vec<Expr> {
         self.comma_separated(TokenKind::RParen, |p| {
             p.with_struct_literals(|p| p.parse_expr())
@@ -398,6 +408,8 @@ impl<'a> Parser<'a> {
             TokenKind::LParen => return self.parse_paren(),
             // `|` starts a closure here; as an infix operator it's bitwise or
             TokenKind::Pipe | TokenKind::PipePipe => return self.parse_closure(),
+            // `[` starts a literal here; after an expression it's an index
+            TokenKind::LBracket => return self.parse_array(),
             TokenKind::LBrace => {
                 let block = self.parse_block();
                 let span = block.info.span;

@@ -106,6 +106,8 @@ pub enum ExprKind {
         end: Box<Expr>,
         inclusive: bool,
     },
+    /// `[1, 2, 3]`
+    Array(Vec<Expr>),
     /// `|x| x + 1`; the body is one expression, which can be a block
     Closure {
         params: Vec<Param>,
